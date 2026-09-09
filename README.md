@@ -1,23 +1,29 @@
-# Il — a Linguagem-Bolha
+# Il — Individuação Livre
 
-Formato de arquivo **determinístico** que agrupa e referencia mídias (textos, imagens, vídeos, áudios), carregando a **licença de uso de cada componente**. A bolha é a **receita** (o manifesto), não o prato renderizado.
+**Il** (*free individuation*) is a project to become oneself through **libre technology** — built so that no empire, platform or gatekeeper holds the keys to your culture, memory or tools.
 
-Protótipo em construção — grupo RB-Il (Individuação Livre / Interface Livre).
+Its first fruit is **Bolha**, a deterministic file format that groups and references media (texts, images, videos, audio) while carrying the **use-license of each component**.
 
-## O que há neste repositório
+## Why it matters
 
-- `juiz/Bolha.lean` — especificação em Lean 4 do tipo "bolha válida": teto de licença (`hash`/`ref`), as três licenças fundadoras, e 2 teoremas provados: *uso-restrito nunca segue referência viva*; *uso-livre pode seguir*. Verificação local exit 0; CI pendente.
-- `arreio.py` — a mão: importa uma anotação, calcula o hash, grava no depósito e gera o manifesto referenciando conteúdo e licença por hash.
-- `LICENCAS.md` — as três licenças fundadoras (`uso-restrito`, `uso-livre`, `uso-privado`).
-- `.forgejo/workflows/verificar.yml` — integração contínua (Forgejo Actions) que roda o Lean sobre o juiz.
+Most formats treat license as metadata — a tag you may ignore. Bolha makes license **structural**: you cannot reference a component without declaring what may be done with it, and the same machinery scales from content to programs and services.
 
-## Ideias centrais
+- **Licenses as bolhas** — a license is itself a bolha (manifesto + hash), referenced by hash. One grammar for content, code and service.
+- **Recipe, not dish** — a bolha is the deterministic manifesto of its parts and pipeline. Content is content-addressed (sha256), immutable, stored apart; the render is a byproduct.
+- **Ceiling (*teto*)** — each license declares the ceiling of its references: freeze at an exact version (`hash`) or follow history (`ref`). The license is the temporal guardian of reproducibility.
+- **Hand and judge** — the harness writes the manifesto; a **Lean 4** judge proves the *form*; a person confirms the *truth*.
 
-- **Conteúdo endereçado por hash** (sha256), imutável, em depósito separado — o git versiona o manifesto (a receita), não os bytes.
-- **Licença como bolha**: cada licença é também uma bolha (manifesto + hash), referenciada por hash — modular para generalizar a conteúdo, programa e serviço.
-- **Teto**: a licença define o teto da referência — congelar na versão exata (`hash`) ou seguir a história (`ref`).
-- **Mão e juiz**: o arreio escreve o manifesto; o Lean confere a forma; a pessoa confirma a verdade.
+## Repository layout
 
-## Licença
+- `juiz/Bolha.lean` — Lean 4 specification of the *valid bolha*: license ceilings, the three founding licenses, two proven theorems.
+- `arreio.py` — the harness: imports an annotation, hashes content, writes the manifesto.
+- `LICENCAS.md` — the founding licenses: `uso-restrito`, `uso-livre`, `uso-privado`.
+- `.forgejo/workflows/verificar.yml` — CI running Lean over the judge.
 
-AGPL-3.0 — ver `LICENSE`.
+## Status
+
+Early prototype. The judge's theorems are verified locally (exit 0); the first CI run is pending.
+
+## License
+
+AGPL-3.0 — see `LICENSE`.
