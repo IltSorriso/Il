@@ -1,0 +1,21 @@
+# Forgejo Actions (Codeberg) — a PRIMEIRA execução real do Lean em CI
+# Responde à pendência registrada nos commits anteriores: "NUNCA rodou em CI"
+name: verificar-juiz
+
+on: [push]
+
+jobs:
+  verificar:
+    runs-on: codeberg-small
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Lean 4 (elan, glibc limpa)
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: O juiz confere
+        run: |
+          lean --version
+          lean juiz/Bolha.lean
