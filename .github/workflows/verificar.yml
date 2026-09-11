@@ -1,6 +1,6 @@
-# GitHub Actions — a execução do juiz em máquina oficial.
-# Roda exatamente o comando verificado localmente: `lean juiz/Bolha.lean`
-# (exit 0 com Lean 4.33.1). A versão fica fixada em lean-toolchain.
+# GitHub Actions — o juiz em máquina oficial.
+# Roda exatamente os comandos verificados localmente (exit 0 com Lean 4.33.1).
+# A versão fica fixada em lean-toolchain.
 name: verificar-juiz
 
 on:
@@ -19,7 +19,10 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
 
-      - name: O juiz confere
+      - name: O juiz — provas abstratas (Bolha.lean)
         run: |
           lean --version
           lean juiz/Bolha.lean
+
+      - name: A ponte — manifestos reais (Ponte.lean)
+        run: lean juiz/Ponte.lean
