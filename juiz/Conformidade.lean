@@ -27,7 +27,7 @@ def lerDeposito? (dir : String) : IO Deposito := do
   try lerDeposito dir catch _ => pure []
 
 def ehAnotacao (txt : String) : Bool :=
-  campo (parseManifesto txt) "tipo" == some "anotacao"
+  tipoDe txt == some "anotacao"
 
 def main : IO UInt32 := do
   let bom       ← lerDeposito  "exemplos/deposito/objetos"
