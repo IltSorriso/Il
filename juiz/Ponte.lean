@@ -1,15 +1,21 @@
-import Std
+import Bolha
 
 /-
-A PONTE — o juiz confere manifestos REAIS (o texto que a mão escreve).
+A PONTE — o juiz confere manifestos REAIS contra um DEPÓSITO.
 
-Modelo simplificado (2026-09-11):
-- O conteúdo é SEMPRE um hash sha256 (endereçamento por conteúdo).
-- A licença é `reservado` OU o hash de uma bolha-licença que exista na coleção
-  e seja do tipo `licenca` (catálogo real: CC / SPDX).
-- O eixo "teto" (hash vs ref) morreu — não há mais checagem de teto.
-- (o hash em si ainda não é conferido por sha256 — fatia seguinte)
+FONTE ÚNICA DE VERDADE: importa `Bolha`; não redefine nada.
+
+UNIFICAÇÃO (2026-09-11): a "coleção" não é uma estrutura à parte — um manifesto
+TAMBÉM é conteúdo endereçado. Então existe UM depósito (hash → texto), e ele
+guarda tanto os objetos de conteúdo quanto os manifestos. Achar uma bolha =
+achar o objeto por hash e conferir que ele é um manifesto do tipo certo.
+
+Fatia "a": além da forma, o juiz confere o ENDEREÇAMENTO — o hash de conteúdo
+declarado tem de existir no depósito. O Bool desse check está provado
+equivalente à especificação lógica (Bolha.noDeposito_iff).
 -/
+
+open Bolha
 
 namespace Ponte
 
@@ -18,15 +24,6 @@ inductive Veredito where
   | verificado
   | reprovado : String → Veredito
   deriving Repr
-
-/-- A licença declarada: `reservado` ou referência (hash) a uma bolha-licença. -/
-inductive Licenca where
-  | reservado
-  | referencia : String → Licenca
-  deriving BEq, Repr, DecidableEq
-
-/-- Uma coleção de bolhas: pares (hash, manifesto-texto). -/
-abbrev Colecao := List (String × String)
 
 /-- trim ASCII → String (sem deprecação). -/
 def trimStr (s : String) : String := (s.trimAscii).toString
@@ -48,21 +45,13 @@ def campo (m : List (String × String)) (chave : String) : Option String :=
   | some (_, v) => some v
   | none => none
 
-/-- Acha o manifesto-texto de uma bolha na coleção pelo seu hash. -/
-def acharBolha (c : Colecao) (h : String) : Option String :=
-  match c.find? (fun p => p.1 == h) with
+/-- O texto do objeto cujo endereço é `h`, se existir no depósito. -/
+def acharObjeto (dep : Deposito) (h : String) : Option String :=
+  match dep.find? (fun p => p.1 == h) with
   | some (_, txt) => some txt
   | none => none
 
-/-- c é dígito hexadecimal? -/
-def ehHex (c : Char) : Bool :=
-  c.isDigit || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
-
-/-- s é um hash sha256 (64 hex)? -/
-def ehHashSha256 (s : String) : Bool :=
-  s.length == 64 && s.all ehHex
-
-/-- "reservado" | <hash sha256> → Licenca. -/
+/-- "reservado" | <hash sha256> → Licenca (tipo do spec). -/
 def parseLicenca (s : String) : Option Licenca :=
   let s := trimStr s
   if s == "reservado" then some .reservado
@@ -76,66 +65,69 @@ def passou (v : Veredito) : Bool :=
   | .reprovado _ => false
 
 /--
-Verifica uma anotação real contra a COLEÇÃO de bolhas.
-- conteúdo: hash sha256 bem-formado (endereçamento por conteúdo, sempre);
-- licença: `reservado`, OU hash de uma bolha que exista na coleção E seja do tipo licenca.
+Verifica uma anotação real contra o DEPÓSITO. Portões (cada um reprova):
+  1. conteúdo é hash sha256 bem-formado?                      (forma)
+  2. o objeto existe no depósito?                             (endereçamento — fatia "a")
+  3. a licença é `reservado`, ou o hash de um objeto que existe no depósito
+     E é um manifesto do tipo `licenca`?
 -/
-def verifica (anotacao : String) (colecao : Colecao) : Veredito :=
+def verifica (anotacao : String) (dep : Deposito) : Veredito :=
   let ma := parseManifesto anotacao
   match campo ma "tipo", campo ma "conteudo", campo ma "licenca" with
   | some "anotacao", some c, some l =>
       if !(ehHashSha256 c) then .reprovado "conteúdo não é hash sha256 válido"
+      else if !(noDeposito dep c) then .reprovado "objeto ausente do depósito (endereço quebrado)"
       else
         match parseLicenca l with
         | none => .reprovado "licença nem 'reservado' nem hash sha256"
         | some .reservado => .verificado
         | some (.referencia h) =>
-            match acharBolha colecao h with
-            | none => .reprovado "bolha-licença não encontrada na coleção"
+            match acharObjeto dep h with
+            | none => .reprovado "licença não encontrada no depósito"
             | some licTexto =>
                 if campo (parseManifesto licTexto) "tipo" == some "licenca"
                 then .verificado
-                else .reprovado "bolha referenciada como licença não é do tipo licenca"
+                else .reprovado "objeto referenciado como licença não é do tipo licenca"
   | _, _, _ => .reprovado "manifesto mal-formado ou tipo desconhecido"
 
-/- Fixtures PÚBLICAS (sintéticas). -/
+/- ============ fixtures sintéticas (TDD de unidade) ============ -/
 def hashDe (c : Char) : String := String.ofList (List.replicate 64 c)
 
 def hashConteudo : String := hashDe 'a'
+def hashOutro    : String := hashDe 'b'
 def hashLicCC    : String := hashDe '1'
 def hashNaoLic   : String := hashDe '2'
 def hashAusente  : String := hashDe '9'
 
-/-- Bolha-licença de catálogo real (Creative Commons). -/
-def bolhaLicCC : String := "tipo: licenca\ncatalogo: CC\nnome: CC0-1.0\n"
-/-- Uma bolha que NÃO é licença (para provar que o tipo é conferido). -/
+def bolhaLicCC  : String := "tipo: licenca\ncatalogo: CC\nnome: CC0-1.0\n"
 def bolhaNaoLic : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: reservado\n"
 
-def colecao : Colecao := [(hashLicCC, bolhaLicCC), (hashNaoLic, bolhaNaoLic)]
+/-- O depósito: conteúdo + a licença + um objeto que não é licença. -/
+def deposito : Deposito :=
+  [(hashConteudo, "o texto do objeto"), (hashLicCC, bolhaLicCC), (hashNaoLic, bolhaNaoLic)]
 
-def aReservado   : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: reservado\n"
-def aComLicenca  : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: " ++ hashLicCC ++ "\n"
-def aAusente     : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: " ++ hashAusente ++ "\n"
-def aInvalida    : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: xyz\n"
-def aConteudoRui : String := "tipo: anotacao\nconteudo: nao-e-hash\nlicenca: reservado\n"
-def aNaoLicenca  : String := "tipo: anotacao\nconteudo: " ++ hashConteudo ++ "\nlicenca: " ++ hashNaoLic ++ "\n"
+def anot (conteudo licenca : String) : String :=
+  "tipo: anotacao\nconteudo: " ++ conteudo ++ "\nlicenca: " ++ licenca ++ "\n"
 
-/- TDD:1 licença `reservado` → verifica. -/
-example : passou (verifica aReservado colecao) = true := by native_decide
-/- TDD:2 licença por hash de bolha tipo `licenca` → verifica. -/
-example : passou (verifica aComLicenca colecao) = true := by native_decide
-/- TDD:3 licença cujo hash NÃO está na coleção → reprova. -/
-example : passou (verifica aAusente colecao) = false := by native_decide
-/- TDD:4 licença nem 'reservado' nem hash → reprova. -/
-example : passou (verifica aInvalida colecao) = false := by native_decide
-/- TDD:5 conteúdo não é hash → reprova. -/
-example : passou (verifica aConteudoRui colecao) = false := by native_decide
-/- TDD:6 hash aponta p/ bolha que NÃO é do tipo licenca → reprova. -/
-example : passou (verifica aNaoLicenca colecao) = false := by native_decide
+/- ============ TDD: 7 testes ============ -/
+-- 1. reservado + objeto no depósito → verifica
+example : passou (verifica (anot hashConteudo "reservado") deposito) = true := by native_decide
+-- 2. licença por hash de objeto tipo licenca + objeto no depósito → verifica
+example : passou (verifica (anot hashConteudo hashLicCC) deposito) = true := by native_decide
+-- 3. objeto AUSENTE do depósito → reprova   [fatia "a"]
+example : passou (verifica (anot hashOutro "reservado") deposito) = false := by native_decide
+-- 4. licença cujo hash não existe no depósito → reprova
+example : passou (verifica (anot hashConteudo hashAusente) deposito) = false := by native_decide
+-- 5. licença nem 'reservado' nem hash → reprova
+example : passou (verifica (anot hashConteudo "xyz") deposito) = false := by native_decide
+-- 6. conteúdo não é hash → reprova
+example : passou (verifica (anot "nao-e-hash" "reservado") deposito) = false := by native_decide
+-- 7. hash aponta p/ objeto que NÃO é do tipo licenca → reprova
+example : passou (verifica (anot hashConteudo hashNaoLic) deposito) = false := by native_decide
 
 /- Demonstração legível. -/
-#eval verifica aReservado colecao
-#eval verifica aComLicenca colecao
-#eval verifica aAusente colecao
+#eval verifica (anot hashConteudo "reservado") deposito
+#eval verifica (anot hashOutro "reservado") deposito
+#eval verifica (anot hashConteudo hashLicCC) deposito
 
 end Ponte

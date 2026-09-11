@@ -1,21 +1,18 @@
 /-
 O JUÍZ — especificação da Bolha válida (Lean 4)
 
-Modelo SIMPLIFICADO (2026-09-11):
-- A licença é EXPLÍCITA: ou o estado `reservado` (nenhum direito concedido —
-  a ausência deliberada de licença), ou a referência (hash) a uma bolha-licença
-  de catálogo real (Creative Commons p/ conteúdo, SPDX p/ programa).
-- O endereçamento é SEMPRE por hash: o eixo "teto" (hash vs ref) morreu.
-  Era decisão técnica de reprodutibilidade vestida de permissão.
-- Consequência honesta: o juiz fica mais fino. Ele prova a FORMA (conteúdo
-  endereçado por hash; licença sempre explícita), não mais sobre tetos.
+FONTE ÚNICA DE VERDADE: a ponte (Ponte.lean) IMPORTA este arquivo; ela não
+redefine nada. Se o spec mudar, a ponte muda por consequência.
+
+Modelo simplificado (2026-09-11):
+- Licença explícita: `reservado` (ausência deliberada de direito) ou referência
+  (hash) a uma bolha-licença de catálogo real (CC / SPDX).
+- Endereçamento SEMPRE por hash (o eixo "teto" morreu).
 -/
 
 namespace Bolha
 
-/-- A licença declarada por uma bolha.
-    `reservado` = estado padrão (nada concedido); `referencia h` = bolha-licença
-    de catálogo real, apontada pelo hash sha256. -/
+/-- A licença declarada por uma bolha. -/
 inductive Licenca where
   | reservado
   | referencia : String → Licenca
@@ -24,7 +21,7 @@ inductive Licenca where
 /-- O manifesto (os campos vão crescer com as espécies). -/
 structure Manifesto where
   tipo     : String
-  conteudo : String   /- SEMPRE um hash sha256 (endereçado por conteúdo) -/
+  conteudo : String   /- hash sha256 (endereçado por conteúdo) -/
   licenca  : Licenca
   deriving Repr
 
@@ -36,44 +33,59 @@ def ehHex (c : Char) : Bool :=
 def ehHashSha256 (s : String) : Bool :=
   s.length == 64 && s.all ehHex
 
-/-- O conteúdo está endereçado por hash? -/
-def conteudoOk (m : Manifesto) : Bool :=
-  ehHashSha256 m.conteudo
+def conteudoOk (m : Manifesto) : Bool := ehHashSha256 m.conteudo
 
-/-- A licença é explícita e bem-formada? `reservado` sempre vale;
-    uma referência precisa ser um hash sha256. -/
 def licencaOk : Licenca → Bool
   | .reservado    => true
   | .referencia h => ehHashSha256 h
 
-/-- Bolha válida = conteúdo endereçado por hash E licença explícita. -/
-def valida (m : Manifesto) : Bool :=
-  conteudoOk m && licencaOk m.licenca
+/-- FORMA da bolha: conteúdo endereçado por hash E licença explícita. -/
+def valida (m : Manifesto) : Bool := conteudoOk m && licencaOk m.licenca
 
 /-
   TEOREMA 1 (determinismo): toda bolha válida carrega conteúdo endereçado
-  por um hash sha256. Não há referência "viva" — o endereço é o conteúdo.
+  por um hash sha256. Não há referência "viva".
 -/
 theorem valida_conteudo_hash (m : Manifesto) (h : valida m = true) :
     ehHashSha256 m.conteudo = true := by
   simp [valida, conteudoOk] at h
   exact h.1
 
-/-
-  TEOREMA 2 (licença explícita): `reservado` nunca coincide com uma
-  referência a bolha-licença. Os dois estados são disjuntos por construção.
--/
+/-- TEOREMA 2 (estados disjuntos): `reservado` nunca é uma referência. -/
 theorem reservado_nao_e_referencia (h : String) :
     Licenca.reservado ≠ Licenca.referencia h := by
-  intro hc
-  cases hc
+  intro hc; cases hc
 
-/-- `reservado` é sempre uma licença válida (não depende de hash algum). -/
 theorem reservado_valido : licencaOk Licenca.reservado = true := rfl
 
-/- Demonstração legível. -/
-#eval valida ⟨"anotacao", String.ofList (List.replicate 64 'a'), .reservado⟩
-#eval valida ⟨"anotacao", "nao-e-hash", .reservado⟩
-#eval valida ⟨"anotacao", String.ofList (List.replicate 64 'a'), .referencia "curto"⟩
+/- ============ O DEPÓSITO (endereçamento por conteúdo) ============ -/
+
+/-- Um depósito por conteúdo: pares (hash, texto do objeto). -/
+abbrev Deposito := List (String × String)
+
+/-- O objeto está presente no depósito? — CHECK EXECUTÁVEL. -/
+def noDeposito (dep : Deposito) (h : String) : Bool :=
+  dep.any (fun p => p.1 == h)
+
+/-- O objeto está presente no depósito? — ESPECIFICAÇÃO LÓGICA. -/
+def Presente (dep : Deposito) (h : String) : Prop :=
+  ∃ p ∈ dep, p.1 = h
+
+/-
+  TEOREMA 3 (REFINAMENTO) — o núcleo confiável do juiz:
+  o check executável (Bool) equivale à especificação lógica (Prop).
+  Isto é o que faz o veredito ser PROVA, não fé na implementação.
+-/
+theorem noDeposito_iff (dep : Deposito) (h : String) :
+    noDeposito dep h = true ↔ Presente dep h := by
+  simp [noDeposito, Presente, List.any_eq_true]
+
+/-- Corolário: hash ausente do depósito não está presente (contrapositiva). -/
+theorem ausente_nao_presente (dep : Deposito) (h : String)
+    (hh : noDeposito dep h = false) : ¬ Presente dep h := by
+  intro hp
+  rw [← noDeposito_iff] at hp
+  rw [hp] at hh
+  exact Bool.noConfusion hh
 
 end Bolha

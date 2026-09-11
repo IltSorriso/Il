@@ -1,6 +1,9 @@
 # GitHub Actions — o juiz em máquina oficial.
-# Roda exatamente os comandos verificados localmente (exit 0 com Lean 4.33.1).
-# A versão fica fixada em lean-toolchain.
+# Ordem imposta pelo desenho:
+#   1. o SPEC (Bolha) compila primeiro --> olean;
+#   2. a PONTE importa o spec (fonte única de verdade), não o redefine;
+#   3. a CONFORMIDADE roda o juiz sobre os artefatos REAIS (exemplos/).
+# A versão do Lean fica fixada em lean-toolchain.
 name: verificar-juiz
 
 on:
@@ -19,10 +22,19 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
 
-      - name: O juiz — provas abstratas (Bolha.lean)
+      - name: O spec — Bolha.lean
+        working-directory: juiz
         run: |
           lean --version
-          lean juiz/Bolha.lean
+          lean -o Bolha.olean Bolha.lean
 
-      - name: A ponte — manifestos reais (Ponte.lean)
-        run: lean juiz/Ponte.lean
+      - name: A ponte — Ponte.lean (importa o spec)
+        working-directory: juiz
+        run: |
+          export LEAN_PATH=".${LEAN_PATH:+:$LEAN_PATH}"
+          lean -o Ponte.olean Ponte.lean
+
+      - name: Conformidade — o juiz sobre os artefatos reais
+        run: |
+          export LEAN_PATH="juiz${LEAN_PATH:+:$LEAN_PATH}"
+          lean --run juiz/Conformidade.lean
