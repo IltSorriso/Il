@@ -6,6 +6,8 @@ CONFORMIDADE — TDD sobre os artefatos REAIS.
 - `exemplos/deposito/`   → cada anotação DEVE verificar;
 - `exemplos/quebrados/`  → cada anotação DEVE reprovar (regressão do portão);
 - `deposito/` (se houver) → a instância LOCAL (ex.: o ateliê) também é conferida.
+  AUSÊNCIA é legítima e é DITA em voz alta; o que este juiz não aceita é o
+  silêncio — um teste que passa sem olhar o objeto não é teste.
 
 Fatia "b": além disso, o juiz RECALCULA o sha256 de cada objeto e confere
 contra o endereço (o nome do arquivo). Duas implementações independentes
@@ -23,8 +25,16 @@ def lerDeposito (dir : String) : IO Deposito := do
     acc := acc ++ [(e.fileName, txt)]
   pure acc
 
-def lerDeposito? (dir : String) : IO Deposito := do
-  try lerDeposito dir catch _ => pure []
+/-- Lê um depósito OPCIONAL — distinguindo AUSENTE de PRESENTE.
+    Ausência é legítima (o tronco só tem `exemplos/`). O que não é legítimo é o
+    silêncio: um erro que não seja ausência é PROPAGADO, não engolido —
+    falha por erro, nunca por omissão. -/
+def lerDepositoOpcional (dir : String) : IO (Option Deposito) := do
+  let existe ← System.FilePath.pathExists dir
+  if existe then
+    some <$> lerDeposito dir
+  else
+    pure none
 
 def ehAnotacao (txt : String) : Bool :=
   tipoDe txt == some "anotacao"
@@ -35,12 +45,16 @@ def hashDeTeste : String := String.ofList (List.replicate 64 'a')
 def main : IO UInt32 := do
   let bom       ← lerDeposito  "exemplos/deposito/objetos"
   let queb      ← lerDeposito  "exemplos/quebrados/objetos"
-  let instancia ← lerDeposito? "deposito/objetos"
+  let instancia? ← lerDepositoOpcional "deposito/objetos"
+  let instancia := instancia?.getD []
   let dep := bom ++ queb ++ instancia
   let mut falhas := 0
   let mut total := 0
 
   IO.println s!"depósito: {bom.length} canônicos + {instancia.length} locais + {queb.length} quebrados"
+  match instancia? with
+  | some d => IO.println s!"  instância local `deposito/objetos`: PRESENTE — {d.length} objeto(s) conferido(s)"
+  | none   => IO.println "  instância local `deposito/objetos`: AUSENTE — nada a conferir (dito em voz alta, não silenciado)"
 
   IO.println "--- ENDEREÇAMENTO (sha256 do texto == chave?) ---"
   for (h, txt) in dep do

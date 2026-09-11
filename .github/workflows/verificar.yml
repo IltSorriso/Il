@@ -45,3 +45,15 @@ jobs:
         run: |
           export LEAN_PATH="juiz${LEAN_PATH:+:$LEAN_PATH}"
           lean --run juiz/Conformidade.lean
+
+  prosa:
+    # O juiz da FORMA dos documentos. Nao julga o conteudo — isso e conversa
+    # humana. Julga o que da para decidir: tipo declarado, nenhum termo morto
+    # em quem afirma o presente, caminho apontado que existe de fato, e so a
+    # capa morando na raiz. O mapa e GERADO aqui, nunca versionado.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Higiene da prosa
+        run: python3 higiene.py --mapa

@@ -1,3 +1,6 @@
 .lake/
 *.olean
 __pycache__/
+
+# gerado por higiene.py — nunca versionado (senao vira sombra e conflita entre os repos)
+MAPA.md

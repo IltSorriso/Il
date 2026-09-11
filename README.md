@@ -1,3 +1,5 @@
+<!-- doc: tipo=capa autoridade=pitch -->
+
 # Il — Individuação Livre
 
 **Il** (*free individuation*) is a project to become oneself through **libre technology** — built so that no empire, platform or gatekeeper holds the keys to your culture, memory or tools.
