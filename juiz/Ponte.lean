@@ -3,13 +3,11 @@ import Std
 /-
 A PONTE — o juiz confere manifestos REAIS (o texto que a mão escreve).
 
-Primeira fatia (SDD + TDD):
-- parsear o formato provisório "chave: valor";
-- verificar a FORMA (campos presentes, hash sha256 bem-formado);
-- resolver o teto da licença (DADO, não tabela fixa) e conferir que a
-  referência o respeita.
-
-As provas abstratas seguem em Bolha.lean; aqui a ponte liga o juiz ao dado real.
+Fatia 2 (SDD + TDD):
+- resolver a licença POR HASH: a anotação aponta `licenca: <hash>`; a ponte
+  acha a bolha-licença na COLEÇÃO pelo hash e lê o teto dela;
+- já não se passa a licença como texto à parte.
+- (o hash em si ainda não é conferido por sha256 — fatia seguinte)
 -/
 
 namespace Ponte
@@ -32,16 +30,19 @@ inductive Veredito where
   | reprovado : String → Veredito
   deriving Repr
 
+/-- Uma coleção de bolhas: pares (hash, manifesto-texto). -/
+abbrev Colecao := List (String × String)
+
 /-- trim ASCII → String (sem deprecação). -/
 def trimStr (s : String) : String := (s.trimAscii).toString
 
-/-- "chave: valor" → (chave, valor), ignorando espaços ao redor. -/
+/-- "chave: valor" → (chave, valor). -/
 def parseLinha (linha : String) : Option (String × String) :=
   match linha.splitOn ":" with
   | [chave, valor] => some (trimStr chave, trimStr valor)
   | _ => none
 
-/-- Manifesto (texto) → lista de pares chave/valor (linhas vazias ignoradas). -/
+/-- Manifesto (texto) → lista de pares chave/valor. -/
 def parseManifesto (texto : String) : List (String × String) :=
   let linhas := (texto.splitOn "\n").filter (fun l => trimStr l != "")
   linhas.filterMap parseLinha
@@ -50,6 +51,12 @@ def parseManifesto (texto : String) : List (String × String) :=
 def campo (m : List (String × String)) (chave : String) : Option String :=
   match m.find? (fun p => p.1 == chave) with
   | some (_, v) => some v
+  | none => none
+
+/-- Acha o manifesto-texto de uma bolha na coleção pelo seu hash. -/
+def acharBolha (c : Colecao) (h : String) : Option String :=
+  match c.find? (fun p => p.1 == h) with
+  | some (_, txt) => some txt
   | none => none
 
 /-- c é dígito hexadecimal? -/
@@ -67,13 +74,17 @@ def parseTeto (s : String) : Option Teto :=
   | "hash,ref" => some .hashOuRef
   | _ => none
 
-/-- conteúdo: um hash, ou "ref <alvo>" (seguir a história). -/
+/-- O teto declarado por uma bolha-licença (a partir do texto dela). -/
+def tetoDeTexto (texto : String) : Option Teto :=
+  campo (parseManifesto texto) "teto" >>= parseTeto
+
+/-- conteúdo: um hash, ou "ref <alvo>". -/
 def parseReferencia (s : String) : Option Referencia :=
   if s.startsWith "ref " then some (.ref (s.drop 4).toString)
   else if ehHashSha256 s then some (.hash s)
   else none
 
-/-- a referência respeita o teto? (espelho de Bolha.respeitaTeto) -/
+/-- a referência respeita o teto? -/
 def respeita (teto : Teto) (r : Referencia) : Bool :=
   match teto, r with
   | .soHash, .ref _ => false
@@ -86,52 +97,58 @@ def passou (v : Veredito) : Bool :=
   | .reprovado _ => false
 
 /--
-Verifica uma anotação real contra o manifesto da licença que a governa.
-Forma + teto (o teto vem do DADO da licença, não de uma tabela fixa).
+Verifica uma anotação real contra a COLEÇÃO de bolhas.
+A licença é resolvida POR HASH: a anotação diz `licenca: <hash>`.
 -/
-def verifica (anotacao : String) (licenca : String) : Veredito :=
+def verifica (anotacao : String) (colecao : Colecao) : Veredito :=
   let ma := parseManifesto anotacao
-  let ml := parseManifesto licenca
-  let tipoA := campo ma "tipo"
-  let conteudo := campo ma "conteudo"
-  let licHash := campo ma "licenca"
-  let teto := campo ml "teto" >>= parseTeto
-  match tipoA, conteudo, licHash, teto with
-  | some "anotacao", some c, some l, some t =>
+  match campo ma "tipo", campo ma "conteudo", campo ma "licenca" with
+  | some "anotacao", some c, some l =>
       if !(ehHashSha256 l) then .reprovado "licença não é um hash sha256 válido"
-      else match parseReferencia c with
-        | none => .reprovado "conteúdo não é hash nem referência válida"
-        | some r => if respeita t r then .verificado else .reprovado "ref sob teto 'hash' (restrito): não segue"
-  | _, _, _, _ => .reprovado "manifesto mal-formado ou tipo desconhecido"
+      else
+        match acharBolha colecao l with
+        | none => .reprovado "licença não encontrada na coleção (hash sem bolha)"
+        | some licTexto =>
+            match tetoDeTexto licTexto with
+            | none => .reprovado "bolha-licença sem teto válido"
+            | some t =>
+                match parseReferencia c with
+                | none => .reprovado "conteúdo não é hash nem referência válida"
+                | some r => if respeita t r then .verificado else .reprovado "ref sob teto 'hash' (restrito): não segue"
+  | _, _, _ => .reprovado "manifesto mal-formado ou tipo desconhecido"
 
-/- Fixtures PÚBLICAS (sintéticas; não vazam o diário). -/
+/- Fixtures PÚBLICAS (sintéticas). -/
+def hashDe (c : Char) : String := String.ofList (List.replicate 64 c)
+
+def hashRestrito    : String := hashDe '1'
+def hashPrivado     : String := hashDe '2'
+def hashInexistente : String := hashDe '9'
+
 def licUsoRestrito : String := "tipo: licenca\nnome: uso-restrito\nteto: hash\nescopo: restrito\n"
 def licUsoPrivado  : String := "tipo: licenca\nnome: uso-privado\nteto: hash,ref\nescopo: privado\n"
 
-def hashExemplo : String := "c6478dd844e67bbbb9b618a937323897c5fc9484f4131fdb52a2fc3bbb07ba6a"
+def colecao : Colecao := [(hashRestrito, licUsoRestrito), (hashPrivado, licUsoPrivado)]
 
-def anotacaoHash : String := "tipo: anotacao\nconteudo: " ++ hashExemplo ++ "\nlicenca: " ++ hashExemplo ++ "\n"
-def anotacaoRef  : String := "tipo: anotacao\nconteudo: ref outra-bolha\nlicenca: " ++ hashExemplo ++ "\n"
-def anotacaoQuebrada : String := "tipo: anotacao\nconteudo: xyz\nlicenca: " ++ hashExemplo ++ "\n"
+def anotacaoHashSobPrivado : String := "tipo: anotacao\nconteudo: " ++ hashDe 'a' ++ "\nlicenca: " ++ hashPrivado ++ "\n"
+def anotacaoRefSobRestrito : String := "tipo: anotacao\nconteudo: ref outra-bolha\nlicenca: " ++ hashRestrito ++ "\n"
+def anotacaoRefSobPrivado  : String := "tipo: anotacao\nconteudo: ref outra-bolha\nlicenca: " ++ hashPrivado ++ "\n"
+def anotacaoLicencaAusente : String := "tipo: anotacao\nconteudo: " ++ hashDe 'a' ++ "\nlicenca: " ++ hashInexistente ++ "\n"
 
-/- TDD: o caso verde. -/
-example : passou (verifica anotacaoHash licUsoPrivado) = true := by native_decide
+/- TDD: anotação sob uso-privado (licença resolvida por hash) → verifica. -/
+example : passou (verifica anotacaoHashSobPrivado colecao) = true := by native_decide
 
-/- TDD: ref sob teto 'hash' (restrito) reprova. -/
-example : passou (verifica anotacaoRef licUsoRestrito) = false := by native_decide
+/- TDD: ref sob uso-restrito (teto hash) → reprova. -/
+example : passou (verifica anotacaoRefSobRestrito colecao) = false := by native_decide
 
-/- TDD: ref sob teto 'hash,ref' (privado/livre) passa. -/
-example : passou (verifica anotacaoRef licUsoPrivado) = true := by native_decide
+/- TDD: ref sob uso-privado (teto hash,ref) → verifica. -/
+example : passou (verifica anotacaoRefSobPrivado colecao) = true := by native_decide
 
-/- TDD: conteúdo malformado reprova. -/
-example : passou (verifica anotacaoQuebrada licUsoPrivado) = false := by native_decide
+/- TDD: licença cujo hash NÃO está na coleção → reprova. -/
+example : passou (verifica anotacaoLicencaAusente colecao) = false := by native_decide
 
-/- TDD: manifesto sem tipo reprova. -/
-example : passou (verifica ("conteudo: " ++ hashExemplo) licUsoPrivado) = false := by native_decide
-
-/- Demonstração legível (não é teste de CI). -/
-#eval verifica anotacaoHash licUsoPrivado
-#eval verifica anotacaoRef licUsoRestrito
-#eval verifica anotacaoRef licUsoPrivado
+/- Demonstração legível. -/
+#eval verifica anotacaoHashSobPrivado colecao
+#eval verifica anotacaoRefSobRestrito colecao
+#eval verifica anotacaoLicencaAusente colecao
 
 end Ponte
