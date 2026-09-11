@@ -7,10 +7,14 @@ FONTE ÚNICA DE VERDADE: importa `Bolha`; NÃO redefine nada. Cada portão usado
 aqui (ehHashSha256, noDeposito, enderecoConfere, licencaOk) é o portão do spec,
 cuja versão executável já está provada equivalente à versão lógica.
 
+PORTÃO 0 — A FORMA CANÔNICA (fatia "d"): o juiz só julga texto na forma
+canônica. Fecha o buraco de determinismo do MANIFESTO: sem isso a mesma bolha
+teria duas grafias e, logo, dois endereços.
+
 TEOREMA DE CORREÇÃO (o que faltava para o SDD fechar):
-`verifica_sound` — se o juiz diz `verificado`, então o manifesto satisfaz a
-ESPECIFICAÇÃO (`Bolha.ManifestoValido`). O veredito deixa de descansar só em
-teste: descansa em prova, e a prova liga o executável ao spec.
+`verifica_sound` — se o juiz diz `verificado`, então (1) o texto está na forma
+canônica e (2) o manifesto satisfaz a ESPECIFICAÇÃO (`Bolha.ManifestoValido`).
+O veredito deixa de descansar só em teste: descansa em prova.
 -/
 
 open Bolha
@@ -48,14 +52,18 @@ def diagnostico (m : Manifesto) (dep : Deposito) : Option String :=
     else some "objeto ausente do depósito (endereço quebrado)"
   else some "conteúdo não é hash sha256 válido"
 
-/-- O juiz: texto real → veredito. -/
+/-- O juiz: texto real → veredito.
+    O PORTÃO 0 é a FORMA CANÔNICA (fatia "d"): fora dela o texto nem é julgado —
+    senão a mesma bolha teria duas grafias e, portanto, dois endereços. -/
 def verifica (texto : String) (dep : Deposito) : Veredito :=
-  match parseManifesto texto with
-  | none => .reprovado "manifesto mal-formado ou tipo desconhecido"
-  | some m =>
-      match diagnostico m dep with
-      | none    => .verificado
-      | some msg => .reprovado msg
+  if canonicidadeOk texto then
+    match parseManifesto texto with
+    | none => .reprovado "manifesto mal-formado ou tipo desconhecido"
+    | some m =>
+        match diagnostico m dep with
+        | none    => .verificado
+        | some msg => .reprovado msg
+  else .reprovado "manifesto fora da forma canônica (campos fora de ordem, sintaxe não normalizada, espécie desconhecida ou campo faltando)"
 
 /-- Ligação entre "sem diagnóstico" e o check booleano pleno do spec. -/
 theorem diagnostico_none_iff (m : Manifesto) (dep : Deposito) :
@@ -74,17 +82,23 @@ theorem diagnostico_none_iff (m : Manifesto) (dep : Deposito) :
       cases h4 : licencaOk dep lic <;>
       simp_all
 
-/-- O juiz responde `verificado` exatamente quando o diagnóstico é vazio. -/
+/-- O juiz responde `verificado` exatamente quando o texto é CANÔNICO e o
+    diagnóstico é vazio. -/
 theorem verifica_verificado_iff (texto : String) (dep : Deposito) :
     verifica texto dep = Veredito.verificado ↔
+      canonicidadeOk texto = true ∧
       ∃ m', parseManifesto texto = some m' ∧ diagnostico m' dep = none := by
   unfold verifica
-  cases hp : parseManifesto texto with
-  | none => simp [hp]
-  | some m =>
-      cases hd : diagnostico m dep with
-      | none => simp [hp, hd]
-      | some msg => simp [hp, hd]
+  by_cases hc : canonicidadeOk texto = true
+  · rw [if_pos hc]
+    cases hp : parseManifesto texto with
+    | none => simp [hc, hp, reprovado_ne_verificado]
+    | some m =>
+        cases hd : diagnostico m dep with
+        | none => simp [hc, hp, hd]
+        | some msg => simp [hc, hp, hd, reprovado_ne_verificado]
+  · rw [if_neg hc]
+    simp [hc, reprovado_ne_verificado]
 
 /--
   TEOREMA DE CORREÇÃO (soundness) — fecha o limiar SDD:
@@ -92,9 +106,10 @@ theorem verifica_verificado_iff (texto : String) (dep : Deposito) :
 -/
 theorem verifica_sound (texto : String) (dep : Deposito)
     (h : verifica texto dep = Veredito.verificado) :
+    canonicidadeOk texto = true ∧
     ∃ m, parseManifesto texto = some m ∧ ManifestoValido m dep := by
-  obtain ⟨m, hm, hd⟩ := (verifica_verificado_iff texto dep).mp h
-  exact ⟨m, hm, (manifestoOkB_iff m dep).mp ((diagnostico_none_iff m dep).mp hd)⟩
+  obtain ⟨hc, m, hm, hd⟩ := (verifica_verificado_iff texto dep).mp h
+  exact ⟨hc, m, hm, (manifestoOkB_iff m dep).mp ((diagnostico_none_iff m dep).mp hd)⟩
 
 /- ============ fixtures com HASHES REAIS (o portão do endereço os exige) ============ -/
 
@@ -141,6 +156,8 @@ example : passou (verifica (anot "nao-e-hash" "reservado") deposito) = false := 
 example : passou (verifica (anot hashObj hashNaoLic) deposito) = false := by native_decide
 -- 9. hash em MAIÚSCULAS não é endereço canônico → reprova  [canonicidade]
 example : passou (verifica (anot (hashObj.toUpper) "reservado") deposito) = false := by native_decide
+-- 10. campos em ORDEM não-canônica → reprova  [forma canônica — fatia "d"]
+example : passou (verifica ("tipo: anotacao\nlicenca: reservado\nconteudo: " ++ hashObj ++ "\n") deposito) = false := by native_decide
 
 #eval verifica (anot hashObj "reservado") deposito
 #eval verifica (anot hashForjado "reservado") deposito

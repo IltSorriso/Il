@@ -194,4 +194,82 @@ theorem depositoEnderecado_iff (dep : Deposito) :
     depositoEnderecado dep = true ↔ DepositoEnderecado dep := by
   simp [depositoEnderecado, DepositoEnderecado, objetoEnderecado, List.all_eq_true]
 
+
+/- ============ FATIA "d": A FORMA CANÔNICA DO MANIFESTO ============ -/
+
+/--
+  O VOCABULÁRIO de uma espécie: seus campos, na ORDEM canônica.
+  A ordem é declarada pela espécie — não é alfabética. Assim `tipo` vem
+  primeiro e os demais na ordem que a espécie define. Espécie desconhecida
+  não tem forma canônica (é o que impede grafias livres).
+-/
+def camposDe : String → Option (List String)
+  | "licenca"  => some ["tipo", "catalogo", "nome"]
+  | "anotacao" => some ["tipo", "conteudo", "licenca"]
+  | _          => none
+
+/-- Um campo na sintaxe canônica: `chave: valor` (um espaço, sem sobras). -/
+def linhaCanonica (chave valor : String) : String := chave ++ ": " ++ valor
+
+/--
+  A FORMA CANÔNICA de um manifesto: SOMENTE os campos que a espécie declara,
+  na ordem canônica, com sintaxe normalizada e um `\n` final.
+  `none` se a espécie é desconhecida ou falta campo obrigatório.
+-/
+def serializarCampos (cs : List (String × String)) : Option String :=
+  match campo cs "tipo" with
+  | none => none
+  | some t =>
+      match camposDe t with
+      | none => none
+      | some chaves =>
+          if chaves.all (fun k => (campo cs k).isSome) then
+            some (String.intercalate "\n"
+              (chaves.map (fun k => linhaCanonica k ((campo cs k).getD ""))) ++ "\n")
+          else none
+
+/-- O texto está na forma canônica? — CHECK EXECUTÁVEL. -/
+def canonicidadeOk (t : String) : Bool :=
+  match serializarCampos (parseCampos t) with
+  | some s => decide (s = t)
+  | none   => false
+
+/-- O texto está na forma canônica? — ESPECIFICAÇÃO LÓGICA. -/
+def TextoCanonico (t : String) : Prop :=
+  ∃ s, serializarCampos (parseCampos t) = some s ∧ s = t
+
+/-- REFINAMENTO: o check executável (Bool) ≡ a especificação lógica (Prop). -/
+theorem canonicidadeOk_iff (t : String) :
+    canonicidadeOk t = true ↔ TextoCanonico t := by
+  unfold canonicidadeOk TextoCanonico
+  cases h : serializarCampos (parseCampos t) with
+  | none   => simp [h]
+  | some s => simp [h, decide_eq_true_eq]
+
+/-- O endereço de uma BOLHA = sha256 do seu texto CANÔNICO. -/
+def enderecoDeBolha (t : String) : Option String :=
+  (serializarCampos (parseCampos t)).map Sha256.endereco
+
+/--
+  TEOREMA (determinismo do endereço da bolha): dois textos canônicos com os
+  MESMOS campos são o MESMO texto. Fecha o buraco — não há duas grafias da
+  mesma bolha, logo não há dois endereços para a mesma bolha.
+-/
+theorem canonico_igual_de_campos (t1 t2 : String)
+    (h1 : TextoCanonico t1) (h2 : TextoCanonico t2)
+    (hc : parseCampos t1 = parseCampos t2) : t1 = t2 := by
+  obtain ⟨s1, hs1, he1⟩ := h1
+  obtain ⟨s2, hs2, he2⟩ := h2
+  rw [hc] at hs1
+  rw [hs1] at hs2
+  have hs : s1 = s2 := by simpa using hs2
+  rw [← he1, ← he2, hs]
+
+/-- COROLÁRIO: mesma informação canônica ⇒ mesmo endereço de bolha. -/
+theorem enderecoDeBolha_igual_de_campos (t1 t2 : String)
+    (h1 : TextoCanonico t1) (h2 : TextoCanonico t2)
+    (hc : parseCampos t1 = parseCampos t2) :
+    enderecoDeBolha t1 = enderecoDeBolha t2 := by
+  rw [canonico_igual_de_campos t1 t2 h1 h2 hc]
+
 end Bolha

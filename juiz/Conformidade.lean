@@ -29,6 +29,9 @@ def lerDeposito? (dir : String) : IO Deposito := do
 def ehAnotacao (txt : String) : Bool :=
   tipoDe txt == some "anotacao"
 
+/-- Hash bem-formado só para o teste negativo de canonicidade. -/
+def hashDeTeste : String := String.ofList (List.replicate 64 'a')
+
 def main : IO UInt32 := do
   let bom       ← lerDeposito  "exemplos/deposito/objetos"
   let queb      ← lerDeposito  "exemplos/quebrados/objetos"
@@ -65,6 +68,28 @@ def main : IO UInt32 := do
       let v := verifica txt dep
       IO.println s!"  {h.take 12}… → {repr v}"
       if passou v then falhas := falhas + 1
+
+  IO.println "--- FORMA CANÔNICA (fatia \"d\") ---"
+  let mut fora := 0
+  for (h, txt) in dep do
+    if (tipoDe txt).isSome then
+      total := total + 1
+      if canonicidadeOk txt then
+        IO.println s!"  {h.take 12}… canônico"
+      else
+        IO.println s!"  {h.take 12}… FORA DA FORMA CANÔNICA"
+        fora := fora + 1
+        falhas := falhas + 1
+  IO.println s!"  objetos fora da forma canônica: {fora}"
+
+  IO.println "--- CANÔNICO? (teste negativo: campos fora de ordem) ---"
+  total := total + 1
+  let torto := "tipo: anotacao\nlicenca: reservado\nconteudo: " ++ hashDeTeste ++ "\n"
+  if canonicidadeOk torto then
+    IO.println "  ERRO: texto fora de ordem passou como canônico"
+    falhas := falhas + 1
+  else
+    IO.println "  texto fora de ordem → corretamente rejeitado (não é canônico)"
 
   IO.println s!"\n{total} conferências, {falhas} falhas"
   if falhas == 0 then pure 0 else pure 1

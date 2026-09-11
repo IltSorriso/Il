@@ -23,6 +23,42 @@ BOLHAS = os.path.join(RAIZ, "bolhas")
 
 RESERVADO = "reservado"
 
+# O VOCABULÁRIO de cada espécie — os campos, NA ORDEM canônica.
+# Espelho do `camposDe` do spec (juiz/Bolha.lean). A concordância das duas
+# implementações é conferida pelos ENDEREÇOS: se o texto divergir, o hash muda.
+CAMPOS = {
+    "licenca":  ["tipo", "catalogo", "nome"],
+    "anotacao": ["tipo", "conteudo", "licenca"],
+}
+
+
+def serializar(campos: dict) -> str:
+    """A FORMA CANÔNICA: só os campos da espécie, na ordem canônica, `\n` final."""
+    tipo = campos.get("tipo")
+    if tipo not in CAMPOS:
+        raise ValueError(f"espécie desconhecida: {tipo!r}")
+    ordem = CAMPOS[tipo]
+    faltando = [k for k in ordem if k not in campos]
+    if faltando:
+        raise ValueError(f"espécie {tipo!r} sem campo obrigatório: {faltando}")
+    return "".join(f"{k}: {campos[k]}\n" for k in ordem)
+
+
+def canonicidade_ok(texto: str) -> bool:
+    """O texto já está na forma canônica? (mesma régua do `canonicidadeOk` do spec)"""
+    campos = {}
+    for linha in texto.split("\n"):
+        if not linha.strip():
+            continue
+        partes = linha.split(":")
+        if len(partes) != 2:
+            return False
+        campos[partes[0].strip()] = partes[1].strip()
+    try:
+        return serializar(campos) == texto
+    except ValueError:
+        return False
+
 
 def hash_bytes(dados: bytes) -> str:
     return hashlib.sha256(dados).hexdigest()
@@ -51,14 +87,14 @@ def gravar_manifesto(nome: str, texto: str) -> str:
 
 def criar_bolha_licenca(catalogo: str, nome: str) -> str:
     """Bolha-licença: aponta para um catálogo REAL. Devolve o hash (endereço)."""
-    manifesto = f"tipo: licenca\ncatalogo: {catalogo}\nnome: {nome}\n"
+    manifesto = serializar({"tipo": "licenca", "catalogo": catalogo, "nome": nome})
     return gravar_manifesto(f"licenca-{catalogo}-{nome}", manifesto)
 
 
 def importar_anotacao(texto: str, licenca: str = RESERVADO):
     """Importa uma anotação: conteúdo por hash + manifesto (também por hash)."""
     h_texto = gravar_objeto(texto.encode("utf-8"))
-    manifesto = f"tipo: anotacao\nconteudo: {h_texto}\nlicenca: {licenca}\n"
+    manifesto = serializar({"tipo": "anotacao", "conteudo": h_texto, "licenca": licenca})
     h_bolha = gravar_manifesto("anotacao-" + h_texto[:12], manifesto)
     return h_texto, h_bolha, manifesto
 
