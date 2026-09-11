@@ -8,21 +8,31 @@ Its first fruit is **Bolha**, a deterministic file format that groups and refere
 
 Most formats treat license as metadata — a tag you may ignore. Bolha makes license **structural**: you cannot reference a component without declaring what may be done with it, and the same machinery scales from content to programs and services.
 
-- **Licenses as bolhas** — a license is itself a bolha (manifesto + hash), referenced by hash. One grammar for content, code and service.
-- **Recipe, not dish** — a bolha is the deterministic manifesto of its parts and pipeline. Content is content-addressed (sha256), immutable, stored apart; the render is a byproduct.
-- **Ceiling (*teto*)** — each license declares the ceiling of its references: freeze at an exact version (`hash`) or follow history (`ref`). The license is the temporal guardian of reproducibility.
-- **Hand and judge** — the harness writes the manifesto; a **Lean 4** judge proves the *form*; a person confirms the *truth*.
+- **A license is itself a bolha** — or the state `reservado` (deliberately no rights granted). A license bolha points to a **real catalog** — Creative Commons for content, SPDX for programs — so the system never invents legal terms, and there is no prose document to drift from the truth.
+- **Content-addressed, always** — every reference is a sha256. A bolha is the deterministic manifesto of its parts; the render is a byproduct.
+- **Hand and judge** — the harness (`arreio.py`) writes the manifesto; a **Lean 4** judge proves the *form*; a person confirms the *truth*.
+
+## The form lives in the judge (see `juiz/`)
+
+The specification is executable, not prose:
+
+- `juiz/Bolha.lean` — the abstract valid bolha: content addressed by hash, license always explicit.
+- `juiz/Ponte.lean` — the bridge: checks real manifestos against a collection of bolhas.
 
 ## Repository layout
 
-- `juiz/Bolha.lean` — Lean 4 specification of the *valid bolha*: license ceilings, the three founding licenses, two proven theorems.
-- `arreio.py` — the harness: imports an annotation, hashes content, writes the manifesto.
-- `LICENCAS.md` — the founding licenses: `uso-restrito`, `uso-livre`, `uso-privado`.
-- `.forgejo/workflows/verificar.yml` — CI running Lean over the judge.
+- `juiz/` — the Lean 4 specification (abstract + bridge to real manifestos).
+- `arreio.py` — the harness: creates a license bolha from a real catalog, imports content by hash.
+- `.github/workflows/verificar.yml` — CI runs the judge.
 
 ## Status
 
-Early prototype. The judge's theorems are verified locally (exit 0); the first CI run is pending.
+Early prototype. The judge is verified locally (exit 0) with Lean 4.33.1 and in CI.
+
+## The two repositories
+
+- **Il** (this one) — public trunk: the product. Code is developed here first.
+- **IltS** — private workshop (a fork): the diary, the plan, and personal content. It pulls from here and never pushes back.
 
 ## License
 

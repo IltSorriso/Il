@@ -1,69 +1,79 @@
 /-
 O JUÍZ — especificação da Bolha válida (Lean 4)
+
+Modelo SIMPLIFICADO (2026-09-11):
+- A licença é EXPLÍCITA: ou o estado `reservado` (nenhum direito concedido —
+  a ausência deliberada de licença), ou a referência (hash) a uma bolha-licença
+  de catálogo real (Creative Commons p/ conteúdo, SPDX p/ programa).
+- O endereçamento é SEMPRE por hash: o eixo "teto" (hash vs ref) morreu.
+  Era decisão técnica de reprodutibilidade vestida de permissão.
+- Consequência honesta: o juiz fica mais fino. Ele prova a FORMA (conteúdo
+  endereçado por hash; licença sempre explícita), não mais sobre tetos.
 -/
 
 namespace Bolha
 
-/-- O teto: o que uma licença permite ao referenciar. -/
-inductive Teto where
-  | soHash    /- congelar: só esta versão exata -/
-  | hashOuRef /- seguir: a história viva -/
-  deriving BEq, Repr
-
-/-- As três licenças fundadoras (bolhas-primeiras). -/
-inductive LicencaId where
-  | usoRestrito | usoLivre | usoPrivado
-  deriving BEq, Repr
-
-/-- O teto declarado por cada licença fundadora. -/
-def tetoDe : LicencaId → Teto
-  | .usoRestrito => .soHash
-  | .usoLivre    => .hashOuRef
-  | .usoPrivado  => .hashOuRef  /- por ora, clone de uso-livre -/
-
-/-- Referência a sub-bolha: congelada (hash) ou viva (ref). -/
-inductive Referencia where
-  | hash : String → Referencia
-  | ref  : String → Referencia
-  deriving BEq, Repr
+/-- A licença declarada por uma bolha.
+    `reservado` = estado padrão (nada concedido); `referencia h` = bolha-licença
+    de catálogo real, apontada pelo hash sha256. -/
+inductive Licenca where
+  | reservado
+  | referencia : String → Licenca
+  deriving BEq, Repr, DecidableEq
 
 /-- O manifesto (os campos vão crescer com as espécies). -/
 structure Manifesto where
   tipo     : String
-  conteudo : Referencia
-  licenca  : LicencaId
+  conteudo : String   /- SEMPRE um hash sha256 (endereçado por conteúdo) -/
+  licenca  : Licenca
+  deriving Repr
 
-/-- A referência respeita o teto da licença que a governa? -/
-def respeitaTeto (lic : LicencaId) (r : Referencia) : Prop :=
-  match tetoDe lic, r with
-  | .soHash, .ref _ => False
-  | _, _            => True
+/-- c é dígito hexadecimal? -/
+def ehHex (c : Char) : Bool :=
+  c.isDigit || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
 
-/-- Bolha válida = toda referência respeita o teto da licença. -/
-def valida (m : Manifesto) : Prop :=
-  respeitaTeto m.licenca m.conteudo
+/-- s é um hash sha256 (64 hex)? -/
+def ehHashSha256 (s : String) : Bool :=
+  s.length == 64 && s.all ehHex
 
-/--
-  TEOREMA 1: uma bolha `uso-restrito` NUNCA segue a história (ref).
-  Se é válida, seu conteúdo é necessariamente um hash.
+/-- O conteúdo está endereçado por hash? -/
+def conteudoOk (m : Manifesto) : Bool :=
+  ehHashSha256 m.conteudo
+
+/-- A licença é explícita e bem-formada? `reservado` sempre vale;
+    uma referência precisa ser um hash sha256. -/
+def licencaOk : Licenca → Bool
+  | .reservado    => true
+  | .referencia h => ehHashSha256 h
+
+/-- Bolha válida = conteúdo endereçado por hash E licença explícita. -/
+def valida (m : Manifesto) : Bool :=
+  conteudoOk m && licencaOk m.licenca
+
+/-
+  TEOREMA 1 (determinismo): toda bolha válida carrega conteúdo endereçado
+  por um hash sha256. Não há referência "viva" — o endereço é o conteúdo.
 -/
-theorem restrito_nao_segue (m : Manifesto) (h : m.licenca = .usoRestrito) :
-    valida m → ∃ s, m.conteudo = .hash s := by
-  intro hv
-  rcases m with ⟨tipo, conteudo, licenca⟩
-  simp at h
-  subst licenca
-  simp [valida, respeitaTeto, tetoDe] at hv
-  cases conteudo with
-  | hash s => exact ⟨s, rfl⟩
-  | ref s  => contradiction
+theorem valida_conteudo_hash (m : Manifesto) (h : valida m = true) :
+    ehHashSha256 m.conteudo = true := by
+  simp [valida, conteudoOk] at h
+  exact h.1
 
-/--
-  TEOREMA 2: uma bolha `uso-livre` PODE seguir (ref) sem quebrar a validade.
-  Construção explícita: conteúdo = ref "algo" é válido sob uso-livre.
+/-
+  TEOREMA 2 (licença explícita): `reservado` nunca coincide com uma
+  referência a bolha-licença. Os dois estados são disjuntos por construção.
 -/
-theorem livre_pode_seguir :
-    valida ⟨"anotacao", .ref "algo", .usoLivre⟩ := by
-  simp [valida, respeitaTeto, tetoDe]
+theorem reservado_nao_e_referencia (h : String) :
+    Licenca.reservado ≠ Licenca.referencia h := by
+  intro hc
+  cases hc
+
+/-- `reservado` é sempre uma licença válida (não depende de hash algum). -/
+theorem reservado_valido : licencaOk Licenca.reservado = true := rfl
+
+/- Demonstração legível. -/
+#eval valida ⟨"anotacao", String.ofList (List.replicate 64 'a'), .reservado⟩
+#eval valida ⟨"anotacao", "nao-e-hash", .reservado⟩
+#eval valida ⟨"anotacao", String.ofList (List.replicate 64 'a'), .referencia "curto"⟩
 
 end Bolha
