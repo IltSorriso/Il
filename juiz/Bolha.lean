@@ -1,3 +1,5 @@
+import Sha256
+
 /-
 O JUÍZ — especificação da Bolha válida (Lean 4)
 
@@ -88,4 +90,29 @@ theorem ausente_nao_presente (dep : Deposito) (h : String)
   rw [hp] at hh
   exact Bool.noConfusion hh
 
+/- ============ ENDEREÇAMENTO POR CONTEÚDO (fatia "b") ============ -/
+
+/-- O objeto está endereçado corretamente? O hash do TEXTO tem de ser a chave.
+    Aqui o juiz RECALCULA o sha256 (Sha256.endereco) — não confia em ninguém. -/
+def objetoEnderecado (p : String × String) : Bool :=
+  Sha256.endereco p.2 == p.1
+
+/-- O depósito inteiro é endereçado por conteúdo? — CHECK EXECUTÁVEL. -/
+def depositoEnderecado (dep : Deposito) : Bool :=
+  dep.all objetoEnderecado
+
+/-- O depósito inteiro é endereçado por conteúdo? — ESPECIFICAÇÃO LÓGICA. -/
+def DepositoEnderecado (dep : Deposito) : Prop :=
+  ∀ p ∈ dep, Sha256.endereco p.2 = p.1
+
+/-
+  TEOREMA 4 (REFINAMENTO do endereçamento): o check executável equivale à
+  especificação lógica. Fecha a promessa "determinístico": o juiz recalcula
+  o hash dos bytes e confere contra o endereço — com prova, não com fé.
+-/
+theorem depositoEnderecado_iff (dep : Deposito) :
+    depositoEnderecado dep = true ↔ DepositoEnderecado dep := by
+  simp [depositoEnderecado, DepositoEnderecado, objetoEnderecado, List.all_eq_true]
+
 end Bolha
+

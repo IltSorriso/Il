@@ -1,8 +1,9 @@
 # GitHub Actions — o juiz em máquina oficial.
 # Ordem imposta pelo desenho:
-#   1. o SPEC (Bolha) compila primeiro --> olean;
-#   2. a PONTE importa o spec (fonte única de verdade), não o redefine;
-#   3. a CONFORMIDADE roda o juiz sobre os artefatos REAIS (exemplos/).
+#   1. o HASH (Sha256) compila;
+#   2. o SPEC (Bolha) importa o hash e define a forma + o endereçamento;
+#   3. a PONTE importa o spec (fonte única de verdade);
+#   4. a CONFORMIDADE roda o juiz sobre os artefatos REAIS.
 # A versão do Lean fica fixada em lean-toolchain.
 name: verificar-juiz
 
@@ -22,10 +23,16 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
 
-      - name: O spec — Bolha.lean
+      - name: O hash — Sha256.lean
         working-directory: juiz
         run: |
           lean --version
+          lean -o Sha256.olean Sha256.lean
+
+      - name: O spec — Bolha.lean (importa o hash)
+        working-directory: juiz
+        run: |
+          export LEAN_PATH=".${LEAN_PATH:+:$LEAN_PATH}"
           lean -o Bolha.olean Bolha.lean
 
       - name: A ponte — Ponte.lean (importa o spec)
