@@ -198,15 +198,34 @@ theorem depositoEnderecado_iff (dep : Deposito) :
 /- ============ FATIA "d": A FORMA CANÔNICA DO MANIFESTO ============ -/
 
 /--
-  O VOCABULÁRIO de uma espécie: seus campos, na ORDEM canônica.
-  A ordem é declarada pela espécie — não é alfabética. Assim `tipo` vem
-  primeiro e os demais na ordem que a espécie define. Espécie desconhecida
-  não tem forma canônica (é o que impede grafias livres).
+  O REGISTRO DE ESPÉCIES da Linguagem-Bolha.
+
+  Cada espécie é um par: o nome, e os seus campos NA ORDEM CANÔNICA — que é
+  declarada, não alfabética (`tipo` vem sempre primeiro).
+
+  Espécie é DADO, não código: acrescentar uma espécie é acrescentar uma linha
+  aqui, sem tocar em nenhuma prova. Um registro que se enumera é o primeiro
+  pedaço do alicerce Médio — e, mais adiante, o que a semente precisará ler
+  para o sistema se descrever.
+
+  A lista é FINITA e FECHADA de propósito: espécie que não está aqui não tem
+  forma canônica, e é isso que impede grafias livres.
 -/
-def camposDe : String → Option (List String)
-  | "licenca"  => some ["tipo", "catalogo", "nome"]
-  | "anotacao" => some ["tipo", "conteudo", "licenca"]
-  | _          => none
+def registroEspecies : List (String × List String) :=
+  [ ("licenca",  ["tipo", "catalogo", "nome"]),
+    ("anotacao", ["tipo", "conteudo", "licenca"]) ]
+
+/--
+  O VOCABULÁRIO de uma espécie: seus campos, na ordem canônica.
+  `none` se a espécie é desconhecida — e espécie desconhecida não tem forma
+  canônica, o que é o mesmo que dizer que ela não existe para o juiz.
+
+  Este vocabulário é espelhado DE PROPÓSITO em `arreio.py` (a mão). São duas
+  implementações independentes, e a concordância delas não é pedida por
+  confiança: é conferida pelo ENDEREÇO — se o texto divergir, o hash diverge.
+-/
+def camposDe (s : String) : Option (List String) :=
+  List.lookup s registroEspecies
 
 /-- Um campo na sintaxe canônica: `chave: valor` (um espaço, sem sobras). -/
 def linhaCanonica (chave valor : String) : String := chave ++ ": " ++ valor
