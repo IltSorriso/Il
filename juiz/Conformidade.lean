@@ -36,11 +36,50 @@ def lerDepositoOpcional (dir : String) : IO (Option Deposito) := do
   else
     pure none
 
-def ehAnotacao (txt : String) : Bool :=
-  tipoDe txt == some "anotacao"
+/-- A bolha é JULGÁVEL? Só as espécies com campo de conteúdo, segundo o spec:
+    o vocabulário não é reescrito aqui. A bolha de licença aponta para um
+    catálogo — não é manifesto de conteúdo, e o juiz não a julga como tal. -/
+def ehJulgavel (txt : String) : Bool :=
+  match tipoDe txt with
+  | some t => (campoDeConteudo t).isSome
+  | none   => false
 
 /-- Hash bem-formado só para o teste negativo de canonicidade. -/
 def hashDeTeste : String := String.ofList (List.replicate 64 'a')
+
+/- ============ A CANÇÃO: as partes e a letra inteira ============ -/
+
+/-- Os endereços das partes: o campo `partes`, separado por vírgula. -/
+def partesDe (txt : String) : List String :=
+  match campo (parseCampos txt) "partes" with
+  | some s => (s.splitOn ",").filter (fun h => h != "")
+  | none   => []
+
+/-- O TEXTO de uma parte. A parte é uma bolha do tipo `parte`, e o texto dela
+    mora no objeto apontado pelo campo `letra`. `none` quando a parte está
+    ausente, é de outro tipo, ou aponta para um texto que não existe. -/
+def textoDaParte (dep : Deposito) (h : String) : Option String :=
+  match objeto dep h with
+  | none => none
+  | some txt =>
+      if tipoDe txt == some "parte" then
+        match campo (parseCampos txt) "letra" with
+        | some hc => objeto dep hc
+        | none    => none
+      else none
+
+/-- A LETRA INTEIRA: a reunião das partes, NA ORDEM que a bolha declara. A
+    receita é a bolha; isto é o prato. Como o prato também tem endereço, ele é
+    conferível contra a receita — e é isso que impede duas verdades sobre a
+    mesma canção. -/
+def letraInteira (dep : Deposito) (h : String) : Option String :=
+  match objeto dep h with
+  | none => none
+  | some txt =>
+      let textos := (partesDe txt).map (textoDaParte dep)
+      if textos.all (fun t => t.isSome) then
+        some (textos.foldl (fun acc t => acc ++ t.getD "") "")
+      else none
 
 def main : IO UInt32 := do
   let bom       ← lerDeposito  "exemplos/deposito/objetos"
@@ -69,7 +108,7 @@ def main : IO UInt32 := do
 
   IO.println "--- DEVEM verificar ---"
   for (h, txt) in bom ++ instancia do
-    if ehAnotacao txt then
+    if ehJulgavel txt then
       total := total + 1
       let v := verifica txt dep
       IO.println s!"  {h.take 12}… → {repr v}"
@@ -77,7 +116,7 @@ def main : IO UInt32 := do
 
   IO.println "--- DEVEM reprovar ---"
   for (h, txt) in queb do
-    if ehAnotacao txt then
+    if ehJulgavel txt then
       total := total + 1
       let v := verifica txt dep
       IO.println s!"  {h.take 12}… → {repr v}"
@@ -105,5 +144,49 @@ def main : IO UInt32 := do
   else
     IO.println "  texto fora de ordem → corretamente rejeitado (não é canônico)"
 
+  IO.println "--- A CANÇÃO (espécie `musica`): as partes e a letra inteira ---"
+  let mut cancoes := 0
+  for (h, txt) in bom ++ instancia do
+    if tipoDe txt == some "musica" then
+      cancoes := cancoes + 1
+      let partes := partesDe txt
+      IO.println s!"  {h.take 12}… {partes.length} parte(s)"
+      for p in partes do
+        total := total + 1
+        if noDeposito dep p && objTipo dep p == some "parte" then
+          IO.println s!"    {p.take 12}… presente, do tipo `parte`"
+        else
+          IO.println s!"    {p.take 12}… AUSENTE ou de outro tipo — não é parte de nada"
+          falhas := falhas + 1
+      total := total + 1
+      match campo (parseCampos txt) "letra", letraInteira dep h with
+      | some declarada, some reunida =>
+          if Sha256.endereco reunida == declarada then
+            IO.println "    a letra inteira é a reunião das partes, na ordem — endereço confere"
+          else
+            IO.println "    a letra inteira NÃO é a reunião das partes — endereço não confere"
+            falhas := falhas + 1
+      | _, _ =>
+          IO.println "    não consegui reunir a letra inteira (parte ou texto ausente)"
+          falhas := falhas + 1
+  if cancoes == 0 then
+    IO.println "  nenhuma bolha da espécie `musica` neste depósito (dito em voz alta)"
+
+  IO.println "--- OS DOIS REGISTROS DO SPEC CONCORDAM? ---"
+  for (especie, chave) in registroConteudo do
+    total := total + 1
+    match camposDe especie with
+    | some chaves =>
+        if chaves.any (fun k => k == chave) then
+          IO.println s!"  {especie}: o campo de conteúdo `{chave}` está no vocabulário"
+        else
+          IO.println s!"  {especie}: o campo de conteúdo `{chave}` NÃO está no vocabulário"
+          falhas := falhas + 1
+    | none =>
+        IO.println s!"  {especie}: tem campo de conteúdo, mas não está no registro de espécies"
+        falhas := falhas + 1
+
   IO.println s!"\n{total} conferências, {falhas} falhas"
+
+
   if falhas == 0 then pure 0 else pure 1

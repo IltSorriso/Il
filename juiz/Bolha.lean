@@ -138,12 +138,39 @@ structure Manifesto where
   licencaTexto : String
   deriving Repr, BEq
 
-/-- Interpreta o texto de uma bolha. Hoje só a espécie `anotacao`. -/
+/--
+  O CAMPO DE CONTEÚDO de cada espécie julgável: onde vive o endereço daquilo
+  que ela carrega. Espécie fora deste registro não carrega conteúdo — a bolha
+  de `licenca` aponta para um catálogo, não para um texto, e o juiz não a julga
+  como manifesto de conteúdo.
+
+  Este registro e o VOCABULÁRIO da fatia "d" (`camposDe`) têm de CONCORDAR: o
+  campo declarado aqui existe no vocabulário daquela espécie. A concordância
+  não é pedida por confiança — é conferida logo abaixo de `camposDe`, e
+  acrescentar espécie num registro só deixa de compilar.
+-/
+def registroConteudo : List (String × String) :=
+  [ ("anotacao", "conteudo"),
+    ("musica",   "letra"),
+    ("parte",    "letra") ]
+
+def campoDeConteudo (s : String) : Option String :=
+  List.lookup s registroConteudo
+
+/-- Interpreta o texto de uma bolha. Julgáveis são as espécies COM campo de
+    conteúdo; as outras não viram manifesto — e o que não vira manifesto não
+    recebe veredito. -/
 def parseManifesto (texto : String) : Option Manifesto :=
   let cs := parseCampos texto
-  match campo cs "tipo", campo cs "conteudo", campo cs "licenca" with
-  | some "anotacao", some c, some l => some { tipo := "anotacao", conteudo := c, licencaTexto := l }
-  | _, _, _ => none
+  match campo cs "tipo", campo cs "licenca" with
+  | some t, some l =>
+      match campoDeConteudo t with
+      | some chave =>
+          match campo cs chave with
+          | some c => some { tipo := t, conteudo := c, licencaTexto := l }
+          | none   => none
+      | none => none
+  | _, _ => none
 
 /-- CHECK EXECUTÁVEL da validade plena (todos os portões). -/
 def manifestoOkB (m : Manifesto) (dep : Deposito) : Bool :=
@@ -210,10 +237,22 @@ theorem depositoEnderecado_iff (dep : Deposito) :
 
   A lista é FINITA e FECHADA de propósito: espécie que não está aqui não tem
   forma canônica, e é isso que impede grafias livres.
+
+  A CANÇÃO (2026-09-12) são duas espécies, e só duas:
+
+  - `musica` — a canção inteira. `letra` é o endereço do TEXTO INTEIRO, que é
+    o RENDER da reunião das `partes`, na ordem declarada. A bolha é a receita;
+    a letra inteira é o prato — e o prato também tem endereço, porque é
+    conferível contra a receita.
+  - `parte` — a parte NUMERADA da canção: intro, verso, refrão, ponte, outro.
+    Cada parte é uma bolha, logo tem ENDEREÇO PRÓPRIO: trocar uma palavra de
+    uma parte muda o endereço DELA — e só dela.
 -/
 def registroEspecies : List (String × List String) :=
   [ ("licenca",  ["tipo", "catalogo", "nome"]),
-    ("anotacao", ["tipo", "conteudo", "licenca"]) ]
+    ("anotacao", ["tipo", "conteudo", "licenca"]),
+    ("musica",   ["tipo", "titulo", "interprete", "letra", "partes", "licenca"]),
+    ("parte",    ["tipo", "numero", "papel", "letra", "licenca"]) ]
 
 /--
   O VOCABULÁRIO de uma espécie: seus campos, na ordem canônica.
@@ -226,6 +265,7 @@ def registroEspecies : List (String × List String) :=
 -/
 def camposDe (s : String) : Option (List String) :=
   List.lookup s registroEspecies
+
 
 /-- Um campo na sintaxe canônica: `chave: valor` (um espaço, sem sobras). -/
 def linhaCanonica (chave valor : String) : String := chave ++ ": " ++ valor

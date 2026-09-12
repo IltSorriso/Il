@@ -24,8 +24,10 @@ The specification is executable, not prose:
 ## Repository layout
 
 - `juiz/` — the Lean 4 specification (abstract + bridge to real manifestos).
-- `arreio.py` — the harness: creates a license bolha from a real catalog, imports content by hash.
-- `.github/workflows/verificar.yml` — CI runs the judge.
+- `arreio.py` — the harness: creates a license bolha from a real catalog, imports content by hash,
+  and carries the **music flow** — a lyric file in, numbered `parte` bolhas and the `musica` bolha out.
+- `.github/workflows/verificar.yml` — CI runs the harness (the music flow) and the judge.
+
 
 ## Status
 

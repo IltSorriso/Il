@@ -16,6 +16,9 @@ Manifestos (revisáveis) -> bolhas/*.bolha  (VISÃO humana; o endereço é o dep
 
 import hashlib
 import os
+import re
+import sys
+import unicodedata
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 DEPOSITO = os.path.join(RAIZ, "deposito", "objetos")
@@ -29,6 +32,22 @@ RESERVADO = "reservado"
 CAMPOS = {
     "licenca":  ["tipo", "catalogo", "nome"],
     "anotacao": ["tipo", "conteudo", "licenca"],
+    # A CANÇÃO. `letra` é o endereço do texto inteiro: o RENDER da reunião das
+    # `partes`, na ordem. `partes` é uma lista de endereços separada por vírgula.
+    "musica":   ["tipo", "titulo", "interprete", "letra", "partes", "licenca"],
+    # A PARTE numerada: intro, verso, refrão, ponte, outro. Cada parte é uma
+    # bolha — logo cada parte tem ENDEREÇO próprio, e trocar uma palavra de uma
+    # parte muda o endereço dela, e só dela.
+    "parte":    ["tipo", "numero", "papel", "letra", "licenca"],
+}
+
+# O CAMPO DE CONTEÚDO de cada espécie julgável — espelho do `registroConteudo`
+# do spec (juiz/Bolha.lean). A bolha de licença não está aqui: ela aponta para
+# um catálogo REAL, não carrega texto, e o juiz não a julga como manifesto.
+CONTEUDO = {
+    "anotacao": "conteudo",
+    "musica":   "letra",
+    "parte":    "letra",
 }
 
 
@@ -99,9 +118,168 @@ def importar_anotacao(texto: str, licenca: str = RESERVADO):
     return h_texto, h_bolha, manifesto
 
 
+# ── O FLUXO DA MÚSICA ────────────────────────────────────────────────────────
+# A letra entra pela MÃO: um arquivo texto com as partes marcadas. A mão escreve
+# o texto de cada parte, a bolha da parte (numerada), a letra inteira (a reunião
+# das partes, na ordem) e a bolha da música. A mão NÃO julga: quem julga é o
+# juiz (juiz/Conformidade.lean), sobre os artefatos que a mão deixou.
+
+PAPEIS = {
+    "intro": "intro", "introducao": "intro",
+    "verso": "verso", "refrao": "refrao", "pre-refrao": "pre-refrao",
+    "ponte": "ponte", "outro": "outro", "coro": "refrao", "corpo": "corpo",
+}
+
+
+def sem_acento(texto: str) -> str:
+    """O texto sem acentos — o PAPEL da parte é metadado ASCII."""
+    return "".join(c for c in unicodedata.normalize("NFD", texto)
+                   if unicodedata.category(c) != "Mn")
+
+
+def nfc(texto: str) -> str:
+    """A forma NORMAL (NFC) do texto.
+
+    Acentuação composta e decomposta são a MESMA palavra em duas grafias — e
+    grafias diferentes dão ENDEREÇOS diferentes. A mão normaliza; o juiz nem
+    fica sabendo que isso existiu. É a porta de uma mão do texto canônico
+    (conversa/PLANO.md, seção 4) decidida aqui, no ponto em que o texto entra.
+
+    """
+    return unicodedata.normalize("NFC", texto)
+
+
+def papel_de(marcador: str) -> str:
+    """O papel de uma parte, a partir do marcador: `[Refrão]` → `refrao`."""
+    chave = sem_acento(nfc(marcador)).strip().lower()
+    chave = "".join(c for c in chave if not c.isdigit())
+    chave = chave.strip(" -_").replace(" ", "-")
+    return PAPEIS.get(chave, chave or "corpo")
+
+
+def ler_partes(caminho: str):
+    """Lê o arquivo da letra: [(papel, texto)], cada texto com um `\n` final.
+
+    As partes são marcadas por linhas `[Nome]`. Recado antes do primeiro
+    marcador (linha começando por `#`) não é letra.
+    """
+    with open(caminho, encoding="utf-8") as f:
+        linhas = nfc(f.read()).split("\n")
+    partes, papel, corpo = [], None, []
+    for linha in linhas:
+        m = re.match(r"^\s*\[(.+?)\]\s*$", linha)
+        if m:
+            if papel is not None:
+                partes.append((papel, corpo))
+            papel, corpo = papel_de(m.group(1)), []
+        elif papel is not None:
+            corpo.append(linha)
+    if papel is not None:
+        partes.append((papel, corpo))
+    saida = []
+    for papel, corpo in partes:
+        while corpo and not corpo[-1].strip():
+            corpo.pop()
+        while corpo and not corpo[0].strip():
+            corpo.pop(0)
+        saida.append((papel, nfc("\n".join(corpo)) + "\n"))
+    return saida
+
+
+def importar_musica(caminho: str, titulo: str, interprete: str, licenca: str = RESERVADO):
+    """O FLUXO: letra → partes numeradas → bolha da música.
+
+    Devolve (endereço da música, manifesto, mapa das partes, endereço da letra
+    inteira). A licença padrão é `reservado`: canção de outra pessoa não é nossa
+    para licenciar — publicar é operação de licença, e é ato de quem tem o
+    direito.
+    """
+    partes = ler_partes(caminho)
+    if not partes:
+        raise ValueError(f"nenhuma parte em {caminho}: marque cada parte com [Nome]")
+    titulo, interprete = nfc(titulo), nfc(interprete)
+    enderecos, mapa = [], []
+    for numero, (papel, texto) in enumerate(partes, start=1):
+        h_texto = gravar_objeto(texto.encode("utf-8"))
+        h_parte = gravar_manifesto(f"parte-{numero:02d}-{h_texto[:12]}", serializar({
+            "tipo": "parte", "numero": str(numero), "papel": papel,
+            "letra": h_texto, "licenca": licenca,
+        }))
+        enderecos.append(h_parte)
+        mapa.append((numero, papel, h_texto, h_parte))
+    letra_inteira = "".join(texto for _, texto in partes)   # a reunião, na ordem
+    h_letra = gravar_objeto(letra_inteira.encode("utf-8"))
+    manifesto = serializar({
+        "tipo": "musica", "titulo": titulo, "interprete": interprete,
+        "letra": h_letra, "partes": ",".join(enderecos), "licenca": licenca,
+    })
+    slug = re.sub(r"[^a-z0-9]+", "-", sem_acento(titulo).lower()).strip("-") or "musica"
+    h_musica = gravar_manifesto(f"musica-{slug}", manifesto)
+    return h_musica, manifesto, mapa, h_letra
+
+
+def imprimir_mapa(titulo: str, interprete: str, licenca: str, h_musica: str, h_letra: str, mapa):
+    """O MAPA: a letra inteira organizada, com o endereço de cada parte."""
+    print(f"\n=== MAPA DA MÚSICA — {titulo} ({interprete}) ===")
+    print(f"  bolha da música   endereço: {h_musica}")
+    print(f"  letra inteira     endereço: {h_letra}   (a reunião das partes, na ordem)")
+    print(f"  licença: {licenca}")
+    print("")
+    print("  nº | papel        | texto da parte          | bolha da parte (endereço)")
+    print("  ---+--------------+-------------------------+------------------------------------------")
+    for numero, papel, h_texto, h_parte in mapa:
+        print(f"  {numero:>2} | {papel:<12} | {h_texto} | {h_parte}")
+
+
+def fluxo_musica(args):
+    """A linha de comando do fluxo:
+
+        python3 arreio.py musica <letra.txt> --titulo T --interprete I
+                                  [--licenca reservado|HASH] [--mapa ARQUIVO]
+
+    O mapa é GERADO, nunca escrito à mão: versionar mapa gerado é criar sombra.
+    """
+    if not args:
+        print("uso: arreio.py musica <letra.txt> --titulo T --interprete I [--licenca L] [--mapa A]")
+        return 1
+    caminho, opcoes, i = args[0], {}, 1
+    while i < len(args):
+        if args[i].startswith("--") and i + 1 < len(args):
+            opcoes[args[i][2:]] = args[i + 1]
+            i += 2
+        else:
+            i += 1
+    titulo, interprete = opcoes.get("titulo"), opcoes.get("interprete")
+    if not titulo or not interprete:
+        print("faltou --titulo e/ou --interprete: a bolha da canção carrega os dois.")
+        return 1
+    licenca = opcoes.get("licenca", RESERVADO)
+    if licenca != RESERVADO and len(licenca) != 64:
+        print(f"licença {licenca!r}: ou `reservado`, ou o hash (64) de uma bolha-licença.")
+        return 1
+    h_musica, manifesto, mapa, h_letra = importar_musica(caminho, titulo, interprete, licenca)
+    imprimir_mapa(titulo, interprete, licenca, h_musica, h_letra, mapa)
+    print("\n  bolha da música:")
+    for linha in manifesto.rstrip().split("\n"):
+        print(f"    {linha}")
+    if opcoes.get("mapa"):
+        with open(opcoes["mapa"], "w", encoding="utf-8") as f:
+            f.write(f"# MAPA DA MÚSICA — {titulo} ({interprete}) — GERADO, nunca escrito à mão\n\n")
+            f.write("| nº | papel | texto da parte | bolha da parte |\n|---|---|---|---|\n")
+            for numero, papel, h_texto, h_parte in mapa:
+                f.write(f"| {numero} | {papel} | `{h_texto}` | `{h_parte}` |\n")
+            f.write(f"\nbolha da música: `{h_musica}`\nletra inteira: `{h_letra}`\nlicença: {licenca}\n")
+        print(f"  mapa escrito em {opcoes['mapa']} (GERADO)")
+    return 0
+
+
 def main():
     os.makedirs(DEPOSITO, exist_ok=True)
     os.makedirs(BOLHAS, exist_ok=True)
+
+    # O FLUXO DA MÚSICA, quando pedido: `arreio.py musica <letra.txt> ...`
+    if len(sys.argv) > 1 and sys.argv[1] == "musica":
+        return fluxo_musica(sys.argv[2:])
 
     print("=== BOLHA-LICENÇA (catálogo real) ===")
     h_cc0 = criar_bolha_licenca("CC", "CC0-1.0")
@@ -128,4 +306,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

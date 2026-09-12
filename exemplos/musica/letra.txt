@@ -1,0 +1,24 @@
+# CANÇÃO DE EXEMPLO — produto do tronco, sem conteúdo de ninguém.
+# A letra entra pela mão: um arquivo texto com as partes marcadas por [Nome].
+# Recado antes do primeiro marcador (linha começando por #) não é letra.
+
+[Introdução]
+(Por que a canção existe: o caso de uso que a ancora.)
+
+[Verso 1]
+A primeira cena. O que se vê, o que se ouve, quem fala.
+
+[Refrão]
+O que volta. A parte que o ouvido guarda.
+
+[Verso 2]
+A segunda cena: o que mudou entre uma e outra.
+
+[Refrão]
+O que volta de novo — e agora volta diferente.
+
+[Ponte]
+Onde a canção se desvia do que já se esperava.
+
+[Outro]
+Como termina: o que fica no ar.

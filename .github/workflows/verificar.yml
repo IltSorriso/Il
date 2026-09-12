@@ -47,7 +47,16 @@ jobs:
           export LEAN_PATH=".${LEAN_PATH:+:$LEAN_PATH}"
           lean -o Ponte.olean Ponte.lean
 
+      - name: O fluxo da música — a mão escreve as partes e a bolha da canção
+        # A letra de exemplo vive em `exemplos/musica/letra.txt`: é PRODUTO do
+        # tronco e não carrega conteúdo de ninguém. O fluxo escreve no depósito
+        # local; o juiz, no passo seguinte, confere o que a mão escreveu.
+        run: |
+          python3 arreio.py musica exemplos/musica/letra.txt \
+            --titulo "Canção de exemplo" --interprete "Exemplo"
+
       - name: Conformidade — o juiz sobre os artefatos reais
+
         run: |
           export LEAN_PATH="juiz${LEAN_PATH:+:$LEAN_PATH}"
           lean --run juiz/Conformidade.lean 2>&1 | tee prova.txt
