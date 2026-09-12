@@ -8,8 +8,7 @@
 name: verificar-juiz
 
 # A permissão extra serve para PUBLICAR O NÚMERO como estado do compromisso:
-# assim a prova fica legível por qualquer um, sem credencial nenhuma. Prova
-# transparente não depende da boa vontade de quem lê nem de quem publica.
+# assim a prova fica legível por qualquer um, sem credencial nenhuma.
 permissions:
   contents: read
   statuses: write
@@ -51,15 +50,23 @@ jobs:
       - name: Conformidade — o juiz sobre os artefatos reais
         run: |
           export LEAN_PATH="juiz${LEAN_PATH:+:$LEAN_PATH}"
-          lean --run juiz/Conformidade.lean 2>&1 | tee prova-juiz.txt
+          lean --run juiz/Conformidade.lean 2>&1 | tee prova.txt
 
       - name: Publicar o número do juiz (legível sem credencial)
         if: always()
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NUM=$(grep -oiE '[0-9]+ *confer[^.]*falhas?' prova-juiz.txt | tail -1)
-          [ -z "$NUM" ] && NUM=$(grep -v '^
+          NUM=$(grep -oiE '[0-9]+ *confer[^.]*falhas?' prova.txt | tail -1)
+          if [ -z "$NUM" ]; then NUM=$(grep -v '^$' prova.txt | tail -2 | tr '\n' ' ' | cut -c1-130); fi
+          if [ -z "$NUM" ]; then NUM="(sem saida capturada)"; fi
+          jq -n --arg d "$NUM" --arg e "${{ job.status }}" '{state:$e,context:"juiz - numero",description:$d}' > corpo.json
+          curl -sS -o /dev/null -w "estado publicado: %{http_code}\n" -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            --data @corpo.json
+
   prosa:
     # O juiz da FORMA dos documentos. Nao julga o conteudo — isso e conversa
     # humana. Julga o que da para decidir: tipo declarado, nenhum termo morto
@@ -70,59 +77,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Higiene da prosa
-        run: python3 higiene.py --mapa 2>&1 | tee prova-prosa.txt
+        run: python3 higiene.py --mapa 2>&1 | tee prova.txt
 
       - name: Publicar o número da prosa (legível sem credencial)
         if: always()
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NUM=$(grep -oiE '[0-9]+ *documento[^.]*falhas?' prova-prosa.txt | tail -1)
-          [ -z "$NUM" ] && NUM=$(grep -v '^ prova-juiz.txt 2>/dev/null | tail -2 | tr '\n' ' ' | cut -c1-130)
-          [ -z "$NUM" ] && NUM="(sem saida capturada)"
-          jq -n --arg d "$NUM" '{state:"${{ job.status }}",context:"juiz - numero",description:$d}' > corpo.json
+          NUM=$(grep -oiE '[0-9]+ *documento[^.]*falhas?' prova.txt | tail -1)
+          if [ -z "$NUM" ]; then NUM=$(grep -v '^$' prova.txt | tail -2 | tr '\n' ' ' | cut -c1-130); fi
+          if [ -z "$NUM" ]; then NUM="(sem saida capturada)"; fi
+          jq -n --arg d "$NUM" --arg e "${{ job.status }}" '{state:$e,context:"prosa - numero",description:$d}' > corpo.json
           curl -sS -o /dev/null -w "estado publicado: %{http_code}\n" -X POST \
             -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
             --data @corpo.json
-
-  prosa:
-    # O juiz da FORMA dos documentos. Nao julga o conteudo — isso e conversa
-    # humana. Julga o que da para decidir: tipo declarado, nenhum termo morto
-    # em quem afirma o presente, caminho apontado que existe de fato, e so a
-    # capa morando na raiz. O mapa e GERADO aqui, nunca versionado.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Higiene da prosa
-        run: python3 higiene.py --mapa
- prova-prosa.txt 2>/dev/null | tail -2 | tr '\n' ' ' | cut -c1-130)
-          [ -z "$NUM" ] && NUM="(sem saida capturada)"
-          jq -n --arg d "$NUM" '{state:"${{ job.status }}",context:"prosa - numero",description:$d}' > corpo.json
-          curl -sS -o /dev/null -w "estado publicado: %{http_code}\n" -X POST \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            --data @corpo.json
- prova-juiz.txt 2>/dev/null | tail -2 | tr '\n' ' ' | cut -c1-130)
-          [ -z "$NUM" ] && NUM="(sem saida capturada)"
-          jq -n --arg d "$NUM" '{state:"${{ job.status }}",context:"juiz - numero",description:$d}' > corpo.json
-          curl -sS -o /dev/null -w "estado publicado: %{http_code}\n" -X POST \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            --data @corpo.json
-
-  prosa:
-    # O juiz da FORMA dos documentos. Nao julga o conteudo — isso e conversa
-    # humana. Julga o que da para decidir: tipo declarado, nenhum termo morto
-    # em quem afirma o presente, caminho apontado que existe de fato, e so a
-    # capa morando na raiz. O mapa e GERADO aqui, nunca versionado.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Higiene da prosa
-        run: python3 higiene.py --mapa
