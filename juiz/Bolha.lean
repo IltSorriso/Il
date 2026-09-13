@@ -192,7 +192,8 @@ structure Conteudo where
 def registroConteudo : List (String × Conteudo) :=
   [ ("anotacao", { campo := "conteudo", texto := true }),
     ("musica",   { campo := "letra",    texto := true }),
-    ("parte",    { campo := "letra",    texto := true }) ]
+    ("parte",    { campo := "letra",    texto := true }),
+    ("declaracao", { campo := "texto",   texto := true }) ]
 
 def campoDeConteudo (s : String) : Option String :=
   (List.lookup s registroConteudo).map (fun c => c.campo)
@@ -414,7 +415,8 @@ def registroEspecies : List (String × List String) :=
   [ ("licenca",  ["tipo", "catalogo", "nome"]),
     ("anotacao", ["tipo", "conteudo", "licenca"]),
     ("musica",   ["tipo", "titulo", "interprete", "letra", "partes", "licenca"]),
-    ("parte",    ["tipo", "numero", "papel", "letra", "licenca"]) ]
+    ("parte",    ["tipo", "numero", "papel", "letra", "licenca"]),
+    ("declaracao", ["tipo", "ramo", "prazo", "texto", "licenca"]) ]
 
 /--
   O VOCABULÁRIO de uma espécie: seus campos, na ordem canônica.
