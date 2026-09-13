@@ -69,13 +69,26 @@ def parseLicenca (s : String) : Option Licenca :=
 
 /- ============ DEPÓSITO: endereçamento por conteúdo ============ -/
 
-/-- Um depósito por conteúdo: pares (endereço, texto do objeto). -/
-abbrev Deposito := List (String × String)
+/--
+  Um depósito por conteúdo: pares (endereço, BYTES do objeto).
 
-def objeto (dep : Deposito) (h : String) : Option String :=
+  Os BYTES são a verdade; o TEXTO é uma VISTA deles. Era a última coisa que
+  prendia o juiz ao texto: a MÃO (`arreio.py`) sempre gravou bytes
+  (`gravar_objeto(dados: bytes)`) e o endereço sempre foi o sha256 dos bytes —
+  o juiz é que decodificava antes de olhar, e por isso não sabia guardar áudio,
+  imagem ou vídeo.
+-/
+abbrev Deposito := List (String × ByteArray)
+
+def objeto (dep : Deposito) (h : String) : Option ByteArray :=
   match dep.find? (fun p => p.1 == h) with
   | some p => some p.2
   | none => none
+
+/-- A VISTA de TEXTO de um objeto. `none` quando os bytes não são UTF-8 válido —
+    e objeto que não é texto não é bolha: bolha se lê. -/
+def objetoTexto (dep : Deposito) (h : String) : Option String :=
+  (objeto dep h).bind String.fromUTF8?
 
 def noDeposito (dep : Deposito) (h : String) : Bool :=
   dep.any (fun p => p.1 == h)
@@ -98,10 +111,10 @@ theorem ausente_nao_presente (dep : Deposito) (h : String)
 /- ============ PORTÃO 1: o objeto existe E seus bytes batem o endereço ============ -/
 
 def enderecoConfere (dep : Deposito) (h : String) : Bool :=
-  dep.any (fun p => p.1 == h && Sha256.endereco p.2 == h)
+  dep.any (fun p => p.1 == h && Sha256.enderecoBytes p.2 == h)
 
 def EnderecoConfere (dep : Deposito) (h : String) : Prop :=
-  ∃ p ∈ dep, p.1 = h ∧ Sha256.endereco p.2 = h
+  ∃ p ∈ dep, p.1 = h ∧ Sha256.enderecoBytes p.2 = h
 
 /-- REFINAMENTO do endereçamento: o juiz recalcula o sha256 — com prova. -/
 theorem enderecoConfere_iff (dep : Deposito) (h : String) :
@@ -110,7 +123,7 @@ theorem enderecoConfere_iff (dep : Deposito) (h : String) :
 
 /-- O `tipo` do objeto apontado por um endereço (none se ausente). -/
 def objTipo (dep : Deposito) (h : String) : Option String :=
-  match objeto dep h with
+  match objetoTexto dep h with
   | some txt => tipoDe txt
   | none => none
 
@@ -153,23 +166,43 @@ structure Manifesto where
   deriving Repr, BEq
 
 /--
-  O CAMPO DE CONTEÚDO de cada espécie julgável: onde vive o endereço daquilo
-  que ela carrega. Espécie fora deste registro não carrega conteúdo — a bolha
-  de `licenca` aponta para um catálogo, não para um texto, e o juiz não a julga
-  como manifesto de conteúdo.
+  O QUE cada espécie julgável CARREGA — duas colunas: ONDE vive o endereço do
+  conteúdo, e SE aquele conteúdo é TEXTO.
+
+  A coluna `texto` não é enfeite. A PORTA DO TEXTO CANÔNICO (`textoOk`) existe
+  para impedir o SILÊNCIO: a mesma palavra em duas grafias dando dois endereços
+  para a mesma coisa. Ela só faz sentido sobre TEXTO — aplicá-la a mídia seria
+  julgar o que a mídia não se propõe, e não aplicá-la a texto reabriria o buraco
+  que ela fechou. Por isso a espécie DECLARA o que carrega.
+
+  Espécie fora deste registro não carrega conteúdo — a bolha de `licenca` aponta
+  para um catálogo, não para um texto, e o juiz não a julga como manifesto.
 
   Este registro e o VOCABULÁRIO da fatia "d" (`camposDe`) têm de CONCORDAR: o
-  campo declarado aqui existe no vocabulário daquela espécie. A concordância
-  não é pedida por confiança — é conferida logo abaixo de `camposDe`, e
-  acrescentar espécie num registro só deixa de compilar.
+  campo declarado aqui existe no vocabulário daquela espécie. A concordância não
+  é pedida por confiança — é conferida pelo Conformidade sobre os artefatos.
 -/
-def registroConteudo : List (String × String) :=
-  [ ("anotacao", "conteudo"),
-    ("musica",   "letra"),
-    ("parte",    "letra") ]
+structure Conteudo where
+  campo : String
+  /-- O conteúdo desta espécie é TEXTO? — e é isto que decide se a PORTA DO
+      TEXTO CANÔNICO (`textoOk`) se aplica. -/
+  texto : Bool
+  deriving Repr, BEq
+
+def registroConteudo : List (String × Conteudo) :=
+  [ ("anotacao", { campo := "conteudo", texto := true }),
+    ("musica",   { campo := "letra",    texto := true }),
+    ("parte",    { campo := "letra",    texto := true }) ]
 
 def campoDeConteudo (s : String) : Option String :=
-  List.lookup s registroConteudo
+  (List.lookup s registroConteudo).map (fun c => c.campo)
+
+/-- O conteúdo desta espécie é TEXTO? — falso para espécie desconhecida, que por
+    isso não tem porta de texto a aplicar. -/
+def conteudoEhTexto (s : String) : Bool :=
+  match List.lookup s registroConteudo with
+  | some c => c.texto
+  | none   => false
 
 /--
   O VALOR do campo de conteúdo da espécie — DERIVADO dos campos, nunca guardado
@@ -224,8 +257,8 @@ def enderecosDeCampo (cs : List (String × String)) (chave : String) : List Stri
 /-- A CONTRIBUIÇÃO de uma parte: o objeto apontado pelo CAMPO DE CONTEÚDO da
     bolha que aquele endereço nomeia. É o que torna a regra GERAL — a parte não
     precisa ser de uma espécie específica; precisa ser uma bolha julgável. -/
-def contribuicao (dep : Deposito) (endereco : String) : Option String :=
-  match objeto dep endereco with
+def contribuicao (dep : Deposito) (endereco : String) : Option ByteArray :=
+  match objetoTexto dep endereco with
   | none => none
   | some txt =>
       match tipoDe txt with
@@ -240,10 +273,10 @@ def contribuicao (dep : Deposito) (endereco : String) : Option String :=
 
 /-- A REUNIÃO: as contribuições concatenadas, NA ORDEM declarada.
     `none` se qualquer parte faltar — reunir pela metade não é reunir. -/
-def reunir (dep : Deposito) (enderecos : List String) : Option String :=
+def reunir (dep : Deposito) (enderecos : List String) : Option ByteArray :=
   let textos := enderecos.map (contribuicao dep)
   if textos.all (fun t => t.isSome) then
-    some (textos.foldl (fun acc t => acc ++ t.getD "") "")
+    some (textos.foldl (fun acc t => acc ++ t.getD ByteArray.empty) ByteArray.empty)
   else none
 
 /-- A REUNIÃO CONFERE? — CHECK EXECUTÁVEL.
@@ -257,7 +290,7 @@ def reuniaoOkB (m : Manifesto) (dep : Deposito) : Bool :=
       | some declarado =>
           match reunir dep (enderecosDeCampo m.campos r.partes) with
           | none         => false
-          | some reunida => decide (declarado = Sha256.endereco reunida)
+          | some reunida => decide (declarado = Sha256.enderecoBytes reunida)
 
 /-- A REUNIÃO CONFERE? — ESPECIFICAÇÃO LÓGICA. -/
 def ReuniaoOk (m : Manifesto) (dep : Deposito) : Prop :=
@@ -269,7 +302,7 @@ def ReuniaoOk (m : Manifesto) (dep : Deposito) : Prop :=
       | some declarado =>
           match reunir dep (enderecosDeCampo m.campos r.partes) with
           | none         => False
-          | some reunida => declarado = Sha256.endereco reunida
+          | some reunida => declarado = Sha256.enderecoBytes reunida
 
 /-- REFINAMENTO: o check executável (Bool) ≡ a especificação lógica (Prop). -/
 theorem reuniaoOkB_iff (m : Manifesto) (dep : Deposito) :
@@ -336,14 +369,14 @@ theorem valido_implica_conteudo_hash (m : Manifesto) (dep : Deposito)
 
 /- ============ O DEPÓSITO INTEIRO (hash de cada objeto) ============ -/
 
-def objetoEnderecado (p : String × String) : Bool :=
-  Sha256.endereco p.2 == p.1
+def objetoEnderecado (p : String × ByteArray) : Bool :=
+  Sha256.enderecoBytes p.2 == p.1
 
 def depositoEnderecado (dep : Deposito) : Bool :=
   dep.all objetoEnderecado
 
 def DepositoEnderecado (dep : Deposito) : Prop :=
-  ∀ p ∈ dep, Sha256.endereco p.2 = p.1
+  ∀ p ∈ dep, Sha256.enderecoBytes p.2 = p.1
 
 /-- REFINAMENTO do endereçamento do depósito inteiro. -/
 theorem depositoEnderecado_iff (dep : Deposito) :
@@ -547,6 +580,26 @@ def TextoCanonicoDeTexto (t : String) : Prop :=
 theorem textoOk_iff (t : String) :
     textoOk t = true ↔ TextoCanonicoDeTexto t := by
   simp [textoOk, TextoCanonicoDeTexto, List.all_eq_true, Bool.not_eq_true]
+
+/-- A PORTA DO TEXTO CANÔNICO, sobre BYTES: decodifica e aplica `textoOk`.
+    `false` se os bytes não são UTF-8 válido — o que não é texto não é texto
+    canônico, e a porta não julga o que não se propõe a julgar. -/
+def bytesTextoOk (b : ByteArray) : Bool :=
+  match String.fromUTF8? b with
+  | some s => textoOk s
+  | none   => false
+
+/-- A PORTA DO TEXTO CANÔNICO sobre bytes — ESPECIFICAÇÃO LÓGICA. -/
+def BytesTextoOk (b : ByteArray) : Prop :=
+  ∃ s, String.fromUTF8? b = some s ∧ TextoCanonicoDeTexto s
+
+/-- REFINAMENTO: o check executável (Bool) ≡ a especificação lógica (Prop). -/
+theorem bytesTextoOk_iff (b : ByteArray) :
+    bytesTextoOk b = true ↔ BytesTextoOk b := by
+  unfold bytesTextoOk BytesTextoOk
+  cases h : String.fromUTF8? b with
+  | none => simp [h]
+  | some s => simp [h, textoOk_iff]
 
 
 end Bolha

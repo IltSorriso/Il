@@ -21,9 +21,13 @@ def lerDeposito (dir : String) : IO Deposito := do
   let entries ← System.FilePath.readDir dir
   let mut acc : Deposito := []
   for e in entries do
-    let txt ← IO.FS.readFile e.path
-    acc := acc ++ [(e.fileName, txt)]
+    let bytes ← IO.FS.readBinFile e.path
+    acc := acc ++ [(e.fileName, bytes)]
   pure acc
+
+/-- A VISTA de texto de um objeto lido do disco. Objeto que não é texto não é
+    bolha — bolha se lê —, e por isso a mídia crua não vira manifesto. -/
+def textoDe (b : ByteArray) : String := (String.fromUTF8? b).getD ""
 
 /-- Lê um depósito OPCIONAL — distinguindo AUSENTE de PRESENTE.
     Ausência é legítima (o tronco só tem `exemplos/`). O que não é legítimo é o
@@ -76,10 +80,10 @@ def main : IO UInt32 := do
   | some d => IO.println s!"  instância local `deposito/objetos`: PRESENTE — {d.length} objeto(s) conferido(s)"
   | none   => IO.println "  instância local `deposito/objetos`: AUSENTE — nada a conferir (dito em voz alta, não silenciado)"
 
-  IO.println "--- ENDEREÇAMENTO (sha256 do texto == chave?) ---"
-  for (h, txt) in dep do
+  IO.println "--- ENDEREÇAMENTO (sha256 dos BYTES == chave?) ---"
+  for (h, bytes) in dep do
     total := total + 1
-    let recalc := Sha256.endereco txt
+    let recalc := Sha256.enderecoBytes bytes
     if recalc == h then
       IO.println s!"  {h.take 12}… confere"
     else
@@ -88,7 +92,8 @@ def main : IO UInt32 := do
   IO.println s!"  depósito inteiro endereçado? {depositoEnderecado dep}"
 
   IO.println "--- DEVEM verificar ---"
-  for (h, txt) in bom ++ instancia do
+  for (h, bytes) in bom ++ instancia do
+    let txt := textoDe bytes
     if ehJulgavel txt then
       total := total + 1
       let v := verifica txt dep
@@ -96,7 +101,8 @@ def main : IO UInt32 := do
       if !passou v then falhas := falhas + 1
 
   IO.println "--- DEVEM reprovar ---"
-  for (h, txt) in queb do
+  for (h, bytes) in queb do
+    let txt := textoDe bytes
     if ehJulgavel txt then
       total := total + 1
       let v := verifica txt dep
@@ -105,7 +111,8 @@ def main : IO UInt32 := do
 
   IO.println "--- FORMA CANÔNICA (fatia \"d\") ---"
   let mut fora := 0
-  for (h, txt) in dep do
+  for (h, bytes) in dep do
+    let txt := textoDe bytes
     if (tipoDe txt).isSome then
       total := total + 1
       if canonicidadeOk txt then
@@ -127,7 +134,8 @@ def main : IO UInt32 := do
 
   IO.println "--- A REUNIÃO (o eixo áudio · imagem · vídeo): o todo é a união das partes? ---"
   let mut comReuniao := 0
-  for (h, txt) in bom ++ instancia do
+  for (h, bytes) in bom ++ instancia do
+    let txt := textoDe bytes
     if temReuniao txt then
       comReuniao := comReuniao + 1
       match parseManifesto txt with
@@ -157,7 +165,8 @@ def main : IO UInt32 := do
     IO.println "  nenhuma bolha declara reunião neste depósito (dito em voz alta)"
 
   IO.println "--- A REUNIÃO REPROVA O QUE A QUEBRA? (teste negativo, do juiz) ---"
-  for (h, txt) in queb do
+  for (h, bytes) in queb do
+    let txt := textoDe bytes
     if temReuniao txt then
       total := total + 1
       if passou (verifica txt dep) then
@@ -167,14 +176,14 @@ def main : IO UInt32 := do
         IO.println s!"  {h.take 12}… corretamente reprovada (a reunião não confere)"
 
   IO.println "--- OS DOIS REGISTROS DO SPEC CONCORDAM? ---"
-  for (especie, chave) in registroConteudo do
+  for (especie, c) in registroConteudo do
     total := total + 1
     match camposDe especie with
     | some chaves =>
-        if chaves.any (fun k => k == chave) then
-          IO.println s!"  {especie}: o campo de conteúdo `{chave}` está no vocabulário"
+        if chaves.any (fun k => k == c.campo) then
+          IO.println s!"  {especie}: o campo de conteúdo `{c.campo}` está no vocabulário"
         else
-          IO.println s!"  {especie}: o campo de conteúdo `{chave}` NÃO está no vocabulário"
+          IO.println s!"  {especie}: o campo de conteúdo `{c.campo}` NÃO está no vocabulário"
           falhas := falhas + 1
     | none =>
         IO.println s!"  {especie}: tem campo de conteúdo, mas não está no registro de espécies"
@@ -183,28 +192,33 @@ def main : IO UInt32 := do
 
   IO.println "--- A FORMA DO TEXTO (a porta de uma mão do texto canônico) ---"
   let mut textosConferidos := 0
-  for (h, txt) in bom ++ instancia do
+  for (h, bytes) in bom ++ instancia do
+    let txt := textoDe bytes
     match tipoDe txt with
     | none => pure ()
     | some t =>
-        match List.lookup t registroConteudo with
-        | none => pure ()
-        | some chave =>
-            match campo (parseCampos txt) chave with
-            | none => pure ()
-            | some enderecoConteudo =>
-                total := total + 1
-                textosConferidos := textosConferidos + 1
-                match objeto dep enderecoConteudo with
-                | none =>
-                    IO.println s!"  {h.take 12}… o texto apontado NÃO está no depósito"
-                    falhas := falhas + 1
-                | some corpo =>
-                    if textoOk corpo then
-                      IO.println s!"  {h.take 12}… texto canônico ({corpo.length} caracteres)"
-                    else
-                      IO.println s!"  {h.take 12}… TEXTO FORA DA FORMA CANÔNICA — outra grafia, outro endereço"
+        if !conteudoEhTexto t then
+          -- MÍDIA: a porta do texto canônico não julga o que não é texto.
+          pure ()
+        else
+          match List.lookup t registroConteudo with
+          | none => pure ()
+          | some c =>
+              match campo (parseCampos txt) c.campo with
+              | none => pure ()
+              | some enderecoConteudo =>
+                  total := total + 1
+                  textosConferidos := textosConferidos + 1
+                  match objeto dep enderecoConteudo with
+                  | none =>
+                      IO.println s!"  {h.take 12}… o texto apontado NÃO está no depósito"
                       falhas := falhas + 1
+                  | some corpo =>
+                      if bytesTextoOk corpo then
+                        IO.println s!"  {h.take 12}… texto canônico ({corpo.size} bytes)"
+                      else
+                        IO.println s!"  {h.take 12}… TEXTO FORA DA FORMA CANÔNICA — outra grafia, outro endereço"
+                        falhas := falhas + 1
   if textosConferidos == 0 then
     IO.println "  nenhum texto a conferir neste depósito (dito em voz alta)"
 

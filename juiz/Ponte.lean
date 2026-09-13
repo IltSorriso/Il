@@ -138,11 +138,14 @@ def textoForjado : String := "um texto cujo endereco nao confere"
 
 def hashAusente : String := String.ofList (List.replicate 64 '9')
 
+/-- O depósito de prova. O TEXTO entra como BYTES — é o mesmo que a mão faz
+    (`gravar_objeto(dados: bytes)`), e nenhum endereço muda por isso: o endereço
+    sempre foi o sha256 dos bytes. -/
 def deposito : Deposito :=
-  [ (hashObj, textoObj)
-  , (hashLicCC, bolhaLicCC)
-  , (hashNaoLic, textoNaoLic)
-  , (hashForjado, textoForjado) ]
+  [ (hashObj, textoObj.toUTF8)
+  , (hashLicCC, bolhaLicCC.toUTF8)
+  , (hashNaoLic, textoNaoLic.toUTF8)
+  , (hashForjado, textoForjado.toUTF8) ]
 
 def anot (conteudo licenca : String) : String :=
   "tipo: anotacao\nconteudo: " ++ conteudo ++ "\nlicenca: " ++ licenca ++ "\n"
