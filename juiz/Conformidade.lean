@@ -47,39 +47,20 @@ def ehJulgavel (txt : String) : Bool :=
 /-- Hash bem-formado só para o teste negativo de canonicidade. -/
 def hashDeTeste : String := String.ofList (List.replicate 64 'a')
 
-/- ============ A CANÇÃO: as partes e a letra inteira ============ -/
+/- ============ A REUNIÃO: as partes e o todo ============ -/
 
-/-- Os endereços das partes: o campo `partes`, separado por vírgula. -/
-def partesDe (txt : String) : List String :=
-  match campo (parseCampos txt) "partes" with
-  | some s => (s.splitOn ",").filter (fun h => h != "")
-  | none   => []
+-- Esta seção NÃO tem regra própria. Até 2026-09-13 tinha: `partesDe`,
+-- `textoDaParte` e `letraInteira` reimplementavam aqui a regra que define a
+-- canção, e o veredito não a conhecia — a mesma regra em dois lugares, e só um
+-- deles decidia. Agora ela vive no SPEC (`registroReuniao`, `contribuicao`,
+-- `reunir`, `reuniaoOkB`) e o CONFORMIDADE só a confere sobre os artefatos
+-- reais. Regra que mora num lugar só não tem como divergir de si mesma.
 
-/-- O TEXTO de uma parte. A parte é uma bolha do tipo `parte`, e o texto dela
-    mora no objeto apontado pelo campo `letra`. `none` quando a parte está
-    ausente, é de outro tipo, ou aponta para um texto que não existe. -/
-def textoDaParte (dep : Deposito) (h : String) : Option String :=
-  match objeto dep h with
-  | none => none
-  | some txt =>
-      if tipoDe txt == some "parte" then
-        match campo (parseCampos txt) "letra" with
-        | some hc => objeto dep hc
-        | none    => none
-      else none
-
-/-- A LETRA INTEIRA: a reunião das partes, NA ORDEM que a bolha declara. A
-    receita é a bolha; isto é o prato. Como o prato também tem endereço, ele é
-    conferível contra a receita — e é isso que impede duas verdades sobre a
-    mesma canção. -/
-def letraInteira (dep : Deposito) (h : String) : Option String :=
-  match objeto dep h with
-  | none => none
-  | some txt =>
-      let textos := (partesDe txt).map (textoDaParte dep)
-      if textos.all (fun t => t.isSome) then
-        some (textos.foldl (fun acc t => acc ++ t.getD "") "")
-      else none
+/-- A espécie declara uma reunião? — pergunta feita ao SPEC, não a uma cópia. -/
+def temReuniao (txt : String) : Bool :=
+  match campo (parseCampos txt) "tipo" with
+  | none   => false
+  | some t => (List.lookup t registroReuniao).isSome
 
 def main : IO UInt32 := do
   let bom       ← lerDeposito  "exemplos/deposito/objetos"
@@ -144,33 +125,46 @@ def main : IO UInt32 := do
   else
     IO.println "  texto fora de ordem → corretamente rejeitado (não é canônico)"
 
-  IO.println "--- A CANÇÃO (espécie `musica`): as partes e a letra inteira ---"
-  let mut cancoes := 0
+  IO.println "--- A REUNIÃO (o eixo áudio · imagem · vídeo): o todo é a união das partes? ---"
+  let mut comReuniao := 0
   for (h, txt) in bom ++ instancia do
-    if tipoDe txt == some "musica" then
-      cancoes := cancoes + 1
-      let partes := partesDe txt
-      IO.println s!"  {h.take 12}… {partes.length} parte(s)"
-      for p in partes do
-        total := total + 1
-        if noDeposito dep p && objTipo dep p == some "parte" then
-          IO.println s!"    {p.take 12}… presente, do tipo `parte`"
-        else
-          IO.println s!"    {p.take 12}… AUSENTE ou de outro tipo — não é parte de nada"
+    if temReuniao txt then
+      comReuniao := comReuniao + 1
+      match parseManifesto txt with
+      | none =>
+          IO.println s!"  {h.take 12}… declara reunião, mas não vira manifesto"
           falhas := falhas + 1
+      | some m =>
+          match List.lookup m.tipo registroReuniao with
+          | none => pure ()
+          | some r =>
+              let partes := enderecosDeCampo m.campos r.partes
+              IO.println s!"  {h.take 12}… espécie `{m.tipo}`: {partes.length} parte(s), união em `{r.uniao}`"
+              for p in partes do
+                total := total + 1
+                if noDeposito dep p && (objTipo dep p).isSome then
+                  IO.println s!"    {p.take 12}… presente, bolha julgável"
+                else
+                  IO.println s!"    {p.take 12}… AUSENTE — não é parte de nada"
+                  falhas := falhas + 1
+              total := total + 1
+              if reuniaoOkB m dep then
+                IO.println "    o campo declarado É a reunião das partes, na ordem — endereço confere"
+              else
+                IO.println "    o campo declarado NÃO é a reunião das partes — o veredito tem de reprovar"
+                falhas := falhas + 1
+  if comReuniao == 0 then
+    IO.println "  nenhuma bolha declara reunião neste depósito (dito em voz alta)"
+
+  IO.println "--- A REUNIÃO REPROVA O QUE A QUEBRA? (teste negativo, do juiz) ---"
+  for (h, txt) in queb do
+    if temReuniao txt then
       total := total + 1
-      match campo (parseCampos txt) "letra", letraInteira dep h with
-      | some declarada, some reunida =>
-          if Sha256.endereco reunida == declarada then
-            IO.println "    a letra inteira é a reunião das partes, na ordem — endereço confere"
-          else
-            IO.println "    a letra inteira NÃO é a reunião das partes — endereço não confere"
-            falhas := falhas + 1
-      | _, _ =>
-          IO.println "    não consegui reunir a letra inteira (parte ou texto ausente)"
-          falhas := falhas + 1
-  if cancoes == 0 then
-    IO.println "  nenhuma bolha da espécie `musica` neste depósito (dito em voz alta)"
+      if passou (verifica txt dep) then
+        IO.println s!"  {h.take 12}… ERRO: bolha que quebra a reunião passou no veredito"
+        falhas := falhas + 1
+      else
+        IO.println s!"  {h.take 12}… corretamente reprovada (a reunião não confere)"
 
   IO.println "--- OS DOIS REGISTROS DO SPEC CONCORDAM? ---"
   for (especie, chave) in registroConteudo do

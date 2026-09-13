@@ -56,8 +56,11 @@ medir() {
   "$@" > "$RAIZ/prova-$rotulo.txt" 2>&1; rc=$?
   t1=$(date +%s%N 2>/dev/null || echo 0)
   printf "  %-30s %8s ms  %s\n" "$rotulo" "$(( (t1 - t0) / 1000000 ))" "$([ $rc -eq 0 ] && echo ok || echo "FALHA($rc)")"
-  return $rc
+  # O MARCO VEM ANTES DO RETURN. Estava DEPOIS, e por isso nunca era escrito: o
+  # canal de erro publicava sempre o ULTIMO passo, nao o que falhou — e o erro
+  # apontava para o lugar errado. Erro que aponta errado e' pior que erro.
   [ $rc -ne 0 ] && : > "$RAIZ/.falhou-$rotulo"
+  return $rc
 }
 
 FALHOU=0
@@ -110,7 +113,10 @@ if [ "$PUBLICAR" = "1" ]; then
       alvo=""; passo="desconhecido"
       for f in "$RAIZ"/.falhou-*; do if [ -e "$f" ]; then alvo="$f"; passo="${f#$RAIZ/.falhou-}"; break; fi; done
       if [ -n "$alvo" ]; then arq="$RAIZ/prova-$passo.txt"; else arq=$(ls -t "$RAIZ"/prova-*.txt 2>/dev/null | head -1); fi
-      cauda=$(grep -v '^$' "$arq" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
+      # A PRIMEIRA linha de erro e' a que diz o defeito; as ultimas linhas de um
+      # compilador sao o eco dele.
+      cauda=$(grep -iE '(^|[^a-zA-Z])error' "$arq" 2>/dev/null | head -1 | tr -s ' ' | cut -c1-130)
+      [ -z "$cauda" ] && cauda=$(grep -v '^$' "$arq" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
       [ -z "$cauda" ] && cauda="(sem saida capturada em $passo)"
       FALHOU_ANTES=$FALHOU; FALHOU=1
       publicar "cadeia - ERRO em $passo" "$cauda"

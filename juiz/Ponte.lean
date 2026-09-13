@@ -11,6 +11,12 @@ PORTÃO 0 — A FORMA CANÔNICA (fatia "d"): o juiz só julga texto na forma
 canônica. Fecha o buraco de determinismo do MANIFESTO: sem isso a mesma bolha
 teria duas grafias e, logo, dois endereços.
 
+PORTÃO 3 — A REUNIÃO (2026-09-13): quando a espécie declara uma reunião, o
+veredito confere que o campo da coisa INTEIRA é a união das partes, na ordem.
+Antes desta fatia a regra vivia só no TESTE — uma segunda verdade —, e uma
+canção que a quebrasse passava no veredito. Agora o veredito É o predicado do
+spec (`reuniaoOkB` / `ReuniaoOk`, ligados por `reuniaoOkB_iff`).
+
 TEOREMA DE CORREÇÃO (o que faltava para o SDD fechar):
 `verifica_sound` — se o juiz diz `verificado`, então (1) o texto está na forma
 canônica e (2) o manifesto satisfaz a ESPECIFICAÇÃO (`Bolha.ManifestoValido`).
@@ -43,11 +49,13 @@ def diagnostico (m : Manifesto) (dep : Deposito) : Option String :=
   if ehHashSha256 m.conteudo then
     if noDeposito dep m.conteudo then
       if enderecoConfere dep m.conteudo then
-        match parseLicenca m.licencaTexto with
-        | none => some "licença nem 'reservado' nem hash sha256"
-        | some lic =>
-            if licencaOk dep lic then none
-            else some "licença inválida (ausente do depósito, endereço não confere, ou não é do tipo licenca)"
+        if reuniaoOkB m dep then
+          match parseLicenca m.licencaTexto with
+          | none => some "licença nem 'reservado' nem hash sha256"
+          | some lic =>
+              if licencaOk dep lic then none
+              else some "licença inválida (ausente do depósito, endereço não confere, ou não é do tipo licenca)"
+        else some "o campo declarado não é a REUNIÃO das partes, na ordem (ou falta uma parte)"
       else some "o endereço não bate com os bytes do objeto"
     else some "objeto ausente do depósito (endereço quebrado)"
   else some "conteúdo não é hash sha256 válido"
@@ -74,12 +82,14 @@ theorem diagnostico_none_iff (m : Manifesto) (dep : Deposito) :
       cases h1 : ehHashSha256 m.conteudo <;>
       cases h2 : noDeposito dep m.conteudo <;>
       cases h3 : enderecoConfere dep m.conteudo <;>
+      cases h4 : reuniaoOkB m dep <;>
       simp_all
   | some lic =>
       cases h1 : ehHashSha256 m.conteudo <;>
       cases h2 : noDeposito dep m.conteudo <;>
       cases h3 : enderecoConfere dep m.conteudo <;>
-      cases h4 : licencaOk dep lic <;>
+      cases h4 : reuniaoOkB m dep <;>
+      cases h5 : licencaOk dep lic <;>
       simp_all
 
 /-- O juiz responde `verificado` exatamente quando o texto é CANÔNICO e o
