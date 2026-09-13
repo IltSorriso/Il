@@ -31,6 +31,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash ferramentas/reproduzir-cadeia.sh --etapa juiz --publicar
 
+  prazos:
+    # A5 cobrada por máquina. Publica ESTADO e não derruba o tronco: a A6 manda o
+    # tronco nunca quebrar, e ramo vencido é dívida de processo, não defeito do produto.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: A5 — prazos dos ramos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ferramentas/fiscal-de-prazos.mjs
   prosa:
     # O juiz da FORMA dos documentos — também pela cadeia única.
     runs-on: ubuntu-latest
