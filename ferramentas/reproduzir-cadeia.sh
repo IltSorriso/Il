@@ -86,8 +86,14 @@ echo "=== NÚMEROS ==="
 publicar() {   # publicar <contexto-base> <descrição>
   local base="$1" desc="$2" ctx
   if [ "$EM_CI" = "1" ]; then ctx="$base"; else ctx="$base [$MAQUINA]"; fi
-  printf '{"state":"%s","context":"%s","description":"%s"}' \
-    "$([ "$FALHOU" = "0" ] && echo success || echo failure)" "$ctx" "$desc" > corpo.json
+  estado=$([ "$FALHOU" = "0" ] && echo success || echo failure)
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg s "$estado" --arg c "$ctx" --arg d "$desc" \
+      '{state:$s,context:$c,description:$d}' > corpo.json
+  else
+    limpo=$(printf '%s' "$desc" | tr '\n' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')
+    printf '{"state":"%s","context":"%s","description":"%s"}' "$estado" "$ctx" "$limpo" > corpo.json
+  fi
   curl -sS -o /dev/null -w "  publicado: $ctx -> %{http_code}\n" -X POST \
     -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/${GITHUB_REPOSITORY:-IltSorriso/Il}/statuses/${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo desconhecido)}" \
@@ -101,15 +107,14 @@ if [ "$PUBLICAR" = "1" ]; then
     [ -n "$NUM_JUIZ" ] && publicar "juiz - numero" "$NUM_JUIZ"
     [ -n "$NUM_PROSA" ] && publicar "prosa - numero" "$NUM_PROSA"
     if [ "$FALHOU" != "0" ]; then
-      primeiro=$(ls "$RAIZ"/.falhou-* 2>/dev/null | head -1)
-      if [ -n "$primeiro" ]; then
-        passo="${primeiro#$RAIZ/.falhou-}"
-        cauda=$(grep -v '^$' "$RAIZ/prova-$passo.txt" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
-        [ -z "$cauda" ] && cauda="(sem saida capturada)"
-        FALHOU_ANTES=$FALHOU; FALHOU=1
-        publicar "cadeia - ERRO em $passo" "$cauda"
-        FALHOU=$FALHOU_ANTES
-      fi
+      alvo=""; passo="desconhecido"
+      for f in "$RAIZ"/.falhou-*; do if [ -e "$f" ]; then alvo="$f"; passo="${f#$RAIZ/.falhou-}"; break; fi; done
+      if [ -n "$alvo" ]; then arq="$RAIZ/prova-$passo.txt"; else arq=$(ls -t "$RAIZ"/prova-*.txt 2>/dev/null | head -1); fi
+      cauda=$(grep -v '^$' "$arq" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
+      [ -z "$cauda" ] && cauda="(sem saida capturada em $passo)"
+      FALHOU_ANTES=$FALHOU; FALHOU=1
+      publicar "cadeia - ERRO em $passo" "$cauda"
+      FALHOU=$FALHOU_ANTES
     fi
   fi
 fi
