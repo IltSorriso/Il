@@ -403,7 +403,7 @@ def ManifestoValido (m : Manifesto) (dep : Deposito) : Prop :=
   match parseLicenca m.licencaTexto with
   | none => False
   | some lic =>
-      (((ehHashSha256 m.conteudo = true ∧ Presente dep m.conteudo)
+      ((((ehHashSha256 m.conteudo = true ∧ Presente dep m.conteudo)
         ∧ EnderecoConfere dep m.conteudo) ∧ ReuniaoOk m dep) ∧ PrazoOk m) ∧ LicencaValida dep lic
 
 /-- REFINAMENTO pleno: o check do manifesto inteiro ≡ a especificação. -/
