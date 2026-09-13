@@ -132,9 +132,23 @@ theorem licencaOk_iff (dep : Deposito) (l : Licenca) :
 
 /- ============ O MANIFESTO E A VALIDADE PLENA ============ -/
 
+/--
+  O MANIFESTO de uma bolha julgável: o tipo, TODOS os campos declarados e o
+  texto da licença.
+
+  Até 2026-09-13 este registro tinha três campos FIXOS — tipo, conteúdo,
+  licença — e por isso o VEREDITO NÃO ENXERGAVA o resto. A regra que define a
+  canção ("a letra inteira é a REUNIÃO das partes, na ordem") não cabia no spec
+  e teve de viver no teste: uma SEGUNDA verdade. O ramo `spec/especies-audio-imagem-video`
+  mediu isso e o declarou; carregar todos os campos é o que devolve ao spec o
+  direito de decidir.
+
+  Isto é forma INTERNA do juiz. A forma da bolha não mudou — logo nenhum
+  endereço mudou.
+-/
 structure Manifesto where
-  tipo        : String
-  conteudo    : String
+  tipo         : String
+  campos       : List (String × String)
   licencaTexto : String
   deriving Repr, BEq
 
@@ -157,6 +171,120 @@ def registroConteudo : List (String × String) :=
 def campoDeConteudo (s : String) : Option String :=
   List.lookup s registroConteudo
 
+/--
+  O VALOR do campo de conteúdo da espécie — DERIVADO dos campos, nunca guardado
+  à parte. Assim não há como os dois discordarem: o manifesto guarda UMA coisa,
+  e o conteúdo é uma leitura dela.
+-/
+def Manifesto.conteudo (m : Manifesto) : String :=
+  match campoDeConteudo m.tipo with
+  | some chave => (campo m.campos chave).getD ""
+  | none       => ""
+
+/- ============ A REUNIÃO — o eixo ÁUDIO · IMAGEM · VÍDEO ============ -/
+
+/--
+  A REGRA DA REUNIÃO, como DADO: espécie → (campo da UNIÃO, campo das PARTES).
+
+  Uma bolha que carrega uma reunião declara DOIS endereços: o da coisa INTEIRA
+  (o prato) e o das PARTES que a compõem, na ordem (a receita). A regra é uma
+  só, e é geral:
+
+      o campo declarado é a REUNIÃO, na ordem, dos endereços listados.
+
+  Ela não é "a regra da canção": é a forma que a canção já tinha. Canção é
+  `letra` = reunião das `partes`; áudio é `mix` = reunião das `faixas`; vídeo é
+  `edicao` = reunião das `faixas`; um corte social (vídeo curto, vídeo longo,
+  post em texto) é a reunião das MESMAS peças, noutra ordem e noutro recorte.
+  Uma forma, muitos usos — e por isso ela mora aqui, e não encravada num caso
+  particular, que viraria três regras parecidas e três verdades.
+
+  Que a mesma peça apareça em VÁRIAS reuniões não é ambiguidade: o endereço diz
+  o CONTEÚDO, e a bolha que o referencia diz a FUNÇÃO. Um arquivo com duas
+  funções são duas bolhas sobre um endereço só.
+
+  Espécie fora deste registro não tem reunião a conferir: para ela nada muda.
+-/
+structure Reuniao where
+  /-- O campo que carrega o endereço da coisa INTEIRA (o prato). -/
+  uniao  : String
+  /-- O campo que LISTA os endereços das partes, na ordem (a receita). -/
+  partes : String
+  deriving Repr, BEq
+
+def registroReuniao : List (String × Reuniao) :=
+  [ ("musica", { uniao := "letra", partes := "partes" }) ]
+
+/-- Os endereços listados num campo: separados por vírgula, sem vazios. -/
+def enderecosDeCampo (cs : List (String × String)) (chave : String) : List String :=
+  match campo cs chave with
+  | some s => (s.splitOn ",").filter (fun h => h != "")
+  | none   => []
+
+/-- A CONTRIBUIÇÃO de uma parte: o objeto apontado pelo CAMPO DE CONTEÚDO da
+    bolha que aquele endereço nomeia. É o que torna a regra GERAL — a parte não
+    precisa ser de uma espécie específica; precisa ser uma bolha julgável. -/
+def contribuicao (dep : Deposito) (endereco : String) : Option String :=
+  match objeto dep endereco with
+  | none => none
+  | some txt =>
+      match tipoDe txt with
+      | none => none
+      | some t =>
+          match campoDeConteudo t with
+          | none => none
+          | some k =>
+              match campo (parseCampos txt) k with
+              | some hc => objeto dep hc
+              | none    => none
+
+/-- A REUNIÃO: as contribuições concatenadas, NA ORDEM declarada.
+    `none` se qualquer parte faltar — reunir pela metade não é reunir. -/
+def reunir (dep : Deposito) (enderecos : List String) : Option String :=
+  let textos := enderecos.map (contribuicao dep)
+  if textos.all (fun t => t.isSome) then
+    some (textos.foldl (fun acc t => acc ++ t.getD "") "")
+  else none
+
+/-- A REUNIÃO CONFERE? — CHECK EXECUTÁVEL.
+    Espécie sem reunião declarada não tem o que conferir: é `true`, não recusa. -/
+def reuniaoOkB (m : Manifesto) (dep : Deposito) : Bool :=
+  match List.lookup m.tipo registroReuniao with
+  | none => true
+  | some r =>
+      match campo m.campos r.uniao with
+      | none => false
+      | some declarado =>
+          match reunir dep (enderecosDeCampo m.campos r.partes) with
+          | none         => false
+          | some reunida => decide (declarado = Sha256.endereco reunida)
+
+/-- A REUNIÃO CONFERE? — ESPECIFICAÇÃO LÓGICA. -/
+def ReuniaoOk (m : Manifesto) (dep : Deposito) : Prop :=
+  match List.lookup m.tipo registroReuniao with
+  | none => True
+  | some r =>
+      match campo m.campos r.uniao with
+      | none => False
+      | some declarado =>
+          match reunir dep (enderecosDeCampo m.campos r.partes) with
+          | none         => False
+          | some reunida => declarado = Sha256.endereco reunida
+
+/-- REFINAMENTO: o check executável (Bool) ≡ a especificação lógica (Prop). -/
+theorem reuniaoOkB_iff (m : Manifesto) (dep : Deposito) :
+    reuniaoOkB m dep = true ↔ ReuniaoOk m dep := by
+  unfold reuniaoOkB ReuniaoOk
+  cases h : List.lookup m.tipo registroReuniao with
+  | none => simp [h]
+  | some r =>
+      cases h1 : campo m.campos r.uniao with
+      | none => simp [h, h1]
+      | some declarado =>
+          cases h2 : reunir dep (enderecosDeCampo m.campos r.partes) with
+          | none         => simp [h, h1, h2]
+          | some reunida => simp [h, h1, h2, decide_eq_true_eq]
+
 /-- Interpreta o texto de uma bolha. Julgáveis são as espécies COM campo de
     conteúdo; as outras não viram manifesto — e o que não vira manifesto não
     recebe veredito. -/
@@ -167,7 +295,7 @@ def parseManifesto (texto : String) : Option Manifesto :=
       match campoDeConteudo t with
       | some chave =>
           match campo cs chave with
-          | some c => some { tipo := t, conteudo := c, licencaTexto := l }
+          | some _ => some { tipo := t, campos := cs, licencaTexto := l }
           | none   => none
       | none => none
   | _, _ => none
@@ -178,15 +306,15 @@ def manifestoOkB (m : Manifesto) (dep : Deposito) : Bool :=
   | none => false
   | some lic =>
       ehHashSha256 m.conteudo && noDeposito dep m.conteudo
-      && enderecoConfere dep m.conteudo && licencaOk dep lic
+      && enderecoConfere dep m.conteudo && reuniaoOkB m dep && licencaOk dep lic
 
 /-- ESPECIFICAÇÃO LÓGICA da validade plena. -/
 def ManifestoValido (m : Manifesto) (dep : Deposito) : Prop :=
   match parseLicenca m.licencaTexto with
   | none => False
   | some lic =>
-      ((ehHashSha256 m.conteudo = true ∧ Presente dep m.conteudo)
-        ∧ EnderecoConfere dep m.conteudo) ∧ LicencaValida dep lic
+      (((ehHashSha256 m.conteudo = true ∧ Presente dep m.conteudo)
+        ∧ EnderecoConfere dep m.conteudo) ∧ ReuniaoOk m dep) ∧ LicencaValida dep lic
 
 /-- REFINAMENTO pleno: o check do manifesto inteiro ≡ a especificação. -/
 theorem manifestoOkB_iff (m : Manifesto) (dep : Deposito) :
@@ -195,7 +323,8 @@ theorem manifestoOkB_iff (m : Manifesto) (dep : Deposito) :
   cases hp : parseLicenca m.licencaTexto with
   | none => simp [hp]
   | some lic =>
-      simp only [hp, Bool.and_eq_true, noDeposito_iff, enderecoConfere_iff, licencaOk_iff]
+      simp only [hp, Bool.and_eq_true, noDeposito_iff, enderecoConfere_iff,
+        reuniaoOkB_iff, licencaOk_iff]
 
 /-- Consequência direta: bolha válida carrega conteúdo endereçado por hash. -/
 theorem valido_implica_conteudo_hash (m : Manifesto) (dep : Deposito)
@@ -203,7 +332,7 @@ theorem valido_implica_conteudo_hash (m : Manifesto) (dep : Deposito)
   unfold ManifestoValido at h
   split at h
   · exact absurd h (by simp)
-  · exact h.1.1.1
+  · exact h.1.1.1.1
 
 /- ============ O DEPÓSITO INTEIRO (hash de cada objeto) ============ -/
 
