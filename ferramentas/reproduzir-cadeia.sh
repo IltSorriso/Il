@@ -56,6 +56,7 @@ medir() {
   t1=$(date +%s%N 2>/dev/null || echo 0)
   printf "  %-30s %8s ms  %s\n" "$rotulo" "$(( (t1 - t0) / 1000000 ))" "$([ $rc -eq 0 ] && echo ok || echo "FALHA($rc)")"
   return $rc
+  [ $rc -ne 0 ] && : > ".falhou-$rotulo"
 }
 
 FALHOU=0
@@ -98,8 +99,19 @@ if [ "$PUBLICAR" = "1" ]; then
   else
     [ -n "$NUM_JUIZ" ] && publicar "juiz - numero" "$NUM_JUIZ"
     [ -n "$NUM_PROSA" ] && publicar "prosa - numero" "$NUM_PROSA"
+    if [ "$FALHOU" != "0" ]; then
+      primeiro=$(ls .falhou-* 2>/dev/null | head -1)
+      if [ -n "$primeiro" ]; then
+        passo="${primeiro#.falhou-}"
+        cauda=$(grep -v '^$' "prova-$passo.txt" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
+        [ -z "$cauda" ] && cauda="(sem saida capturada)"
+        FALHOU_ANTES=$FALHOU; FALHOU=1
+        publicar "cadeia - ERRO em $passo" "$cauda"
+        FALHOU=$FALHOU_ANTES
+      fi
+    fi
   fi
 fi
 
-rm -f corpo.json
+rm -f corpo.json .falhou-*
 exit $FALHOU
