@@ -12,6 +12,9 @@ const SHA = process.env.GITHUB_SHA || '';
 const cab = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'fiscal-de-prazos' };
 if (TOKEN) cab['Authorization'] = 'Bearer ' + TOKEN;
 
+import { existsSync as fsExists, readFileSync } from "node:fs";
+const readTexto = (f) => { try { return readFileSync(f, "utf8"); } catch (e) { return ""; } };
+
 const api = async (u) => {
   for (let k = 0; k < 3; k++) {
     try { const r = await fetch('https://api.github.com' + u, { headers: cab }); if (r.ok) return r.json(); }
@@ -52,11 +55,35 @@ const desc = partes.join(', ').slice(0, 130);
 // (A6) e o vermelho deixaria de significar o que significa.
 const estado = 'success';
 
+// ─── A SEGUNDA DÍVIDA: O DIÁRIO ATRÁS DO TRABALHO ─────────────────────────
+// O contrato já admite a sombra: "o diário fica para trás". Aqui ela vira número.
+// O diário vive no ATELIÊ (privado); no tronco não existe, e isso é dito em voz alta.
+const DIARIO = "conversa/Bolha.md";
+let diarioAtraso = null;
+if (fsExists(DIARIO)) {
+  const texto = readTexto(DIARIO);
+  const datas = [...texto.matchAll(/^##\s+(\d{4}-\d{2}-\d{2})/gm)].map((m) => m[1]).sort();
+  const ultima = datas[datas.length - 1];
+  const commits = await api(`/repos/${DONO}/${REPO}/commits?sha=${repo.default_branch}&per_page=1`);
+  const ultimoCommit = (commits && commits[0] && commits[0].commit.author.date || "").slice(0, 10);
+  if (!ultima) { console.log("  diário: nenhuma entrada DATADA (## AAAA-MM-DD) — dívida"); diarioAtraso = "sem entrada datada"; }
+  else if (ultimoCommit && ultima < ultimoCommit) {
+    const dias = Math.round((new Date(ultimoCommit) - new Date(ultima)) / 86400000);
+    console.log(`  diário: última entrada ${ultima}, último compromisso ${ultimoCommit} — ${dias} dia(s) atrás`);
+    diarioAtraso = `${dias} dia(s) atras`;
+  } else console.log(`  diário: última entrada ${ultima} — em dia com o compromisso ${ultimoCommit}`);
+} else console.log("  diário: não existe aqui (é do ateliê) — nada a cobrar neste repositório");
 if (TOKEN && SHA) {
   const r = await fetch(`https://api.github.com/repos/${DONO}/${REPO}/statuses/${SHA}`, {
     method: 'POST', headers: { ...cab, 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: estado, context: 'A5 - prazos', description: desc }),
   });
   console.log('  estado publicado: ' + r.status + ' — ' + desc);
+  const descDiario = diarioAtraso ? `diario atras: ${diarioAtraso}` : 'diario em dia (ou ausente neste repositorio)';
+  const r2 = await fetch(`https://api.github.com/repos/${DONO}/${REPO}/statuses/${SHA}`, {
+    method: 'POST', headers: { ...cab, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state: 'success', context: 'Diario - atraso', description: descDiario.slice(0,130) }),
+  });
+  console.log('  estado publicado: ' + r2.status + ' — ' + descDiario);
 } else console.log('  (sem credencial: não publica)');
 process.exit(0);   // SEMPRE zero: dívida de processo não derruba o produto
