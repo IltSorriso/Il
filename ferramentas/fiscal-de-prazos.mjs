@@ -29,14 +29,33 @@ const ramos = (await api(`/repos/${DONO}/${REPO}/branches`)) || [];
 const hoje = new Date();
 const noPrazo = [], vencidos = [], semDeclaracao = [];
 
+// Onde mora o objeto da declaração no ramo. É o mesmo depósito dos exemplos.
+const CAMINHO_DECL = 'exemplos/deposito/objetos/';
+
 for (const b of ramos) {
   if (b.name === repo.default_branch) continue;
   const c = await api(`/repos/${DONO}/${REPO}/commits/${b.commit.sha}`);
   const msg = (c && c.commit && c.commit.message) || '';
+  // CANAL 1 — a declaração é uma BOLHA: o compromisso carrega o ENDEREÇO, e o
+  // prazo é um CAMPO lido do objeto, não um palpite sobre prosa.
+  const end = msg.match(/declaracao\s*:\s*([0-9a-f]{64})/i);
+  if (end) {
+    const obj = await api(`/repos/${DONO}/${REPO}/contents/${CAMINHO_DECL}${end[1]}?ref=${b.name}`);
+    if (!obj || !obj.content) { semDeclaracao.push(`${b.name} (o endereço não resolve)`); continue; }
+    const texto = Buffer.from(obj.content, 'base64').toString('utf8');
+    const campo = texto.match(/^prazo:\s*(\d{4}-\d{2}-\d{2})\s*$/m);
+    if (!campo) { semDeclaracao.push(`${b.name} (a bolha não declara prazo)`); continue; }
+    const prazo = new Date(campo[1] + 'T23:59:59Z');
+    (prazo < hoje ? vencidos : noPrazo).push(`${b.name} [${campo[1]}] bolha`);
+    continue;
+  }
+
+  // CANAL 2 (transição) — a prosa de antes, lida por expressão regular. Fica
+  // enquanto houver ramo declarado do jeito velho; o número diz QUAL canal falou.
   const m = msg.match(/Prazo\s*\(A5\)\s*:\s*(\d{4}-\d{2}-\d{2})/i);
   if (!m) { semDeclaracao.push(b.name); continue; }
   const prazo = new Date(m[1] + 'T23:59:59Z');
-  (prazo < hoje ? vencidos : noPrazo).push(`${b.name} [${m[1]}]`);
+  (prazo < hoje ? vencidos : noPrazo).push(`${b.name} [${m[1]}] prosa`);
 }
 
 const fora = ramos.filter((b) => b.name !== repo.default_branch);
