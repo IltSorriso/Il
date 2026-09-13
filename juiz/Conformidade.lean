@@ -216,7 +216,7 @@ def main : IO UInt32 := do
 
   IO.println "--- CANÔNICO? (teste negativo: acento decomposto) ---"
   total := total + 1
-  let decomposto := "cano\u{0302}nico"
+  let decomposto := "cano\u0302nico"
   if textoOk decomposto then
     IO.println "  ERRO: texto com acento decomposto passou como canônico"
     falhas := falhas + 1
