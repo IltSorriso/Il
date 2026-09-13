@@ -17,6 +17,7 @@
 #   ferramentas/reproduzir-cadeia.sh [--etapa juiz|prosa|tudo] [--sem-instalar] [--publicar]
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
+RAIZ="$(pwd)"
 
 ETAPA="tudo"; PUBLICAR=0; INSTALAR=1
 while [ $# -gt 0 ]; do
@@ -52,11 +53,11 @@ medir() {
   local rotulo="$1"; shift
   local t0 t1 rc
   t0=$(date +%s%N 2>/dev/null || echo 0)
-  "$@" > "prova-$rotulo.txt" 2>&1; rc=$?
+  "$@" > "$RAIZ/prova-$rotulo.txt" 2>&1; rc=$?
   t1=$(date +%s%N 2>/dev/null || echo 0)
   printf "  %-30s %8s ms  %s\n" "$rotulo" "$(( (t1 - t0) / 1000000 ))" "$([ $rc -eq 0 ] && echo ok || echo "FALHA($rc)")"
   return $rc
-  [ $rc -ne 0 ] && : > ".falhou-$rotulo"
+  [ $rc -ne 0 ] && : > "$RAIZ/.falhou-$rotulo"
 }
 
 FALHOU=0
@@ -73,8 +74,8 @@ if [ "$ETAPA" = "prosa" ] || [ "$ETAPA" = "tudo" ]; then
   medir higiene-da-prosa python3 higiene.py --mapa || FALHOU=1
 fi
 
-NUM_JUIZ=$(grep -oiE '[0-9]+ *confer[^.]*falhas?' prova-conformidade.txt 2>/dev/null | tail -1)
-NUM_PROSA=$(grep -oiE '[0-9]+ *documento[^.]*falhas?' prova-higiene-da-prosa.txt 2>/dev/null | tail -1)
+NUM_JUIZ=$(grep -oiE '[0-9]+ *confer[^.]*falhas?' "$RAIZ/prova-conformidade.txt" 2>/dev/null | tail -1)
+NUM_PROSA=$(grep -oiE '[0-9]+ *documento[^.]*falhas?' "$RAIZ/prova-higiene-da-prosa.txt" 2>/dev/null | tail -1)
 
 echo
 echo "=== NÚMEROS ==="
@@ -100,10 +101,10 @@ if [ "$PUBLICAR" = "1" ]; then
     [ -n "$NUM_JUIZ" ] && publicar "juiz - numero" "$NUM_JUIZ"
     [ -n "$NUM_PROSA" ] && publicar "prosa - numero" "$NUM_PROSA"
     if [ "$FALHOU" != "0" ]; then
-      primeiro=$(ls .falhou-* 2>/dev/null | head -1)
+      primeiro=$(ls "$RAIZ"/.falhou-* 2>/dev/null | head -1)
       if [ -n "$primeiro" ]; then
-        passo="${primeiro#.falhou-}"
-        cauda=$(grep -v '^$' "prova-$passo.txt" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
+        passo="${primeiro#$RAIZ/.falhou-}"
+        cauda=$(grep -v '^$' "$RAIZ/prova-$passo.txt" 2>/dev/null | tail -3 | tr '\n' ' ' | tr -s ' ' | cut -c1-130)
         [ -z "$cauda" ] && cauda="(sem saida capturada)"
         FALHOU_ANTES=$FALHOU; FALHOU=1
         publicar "cadeia - ERRO em $passo" "$cauda"
@@ -113,5 +114,5 @@ if [ "$PUBLICAR" = "1" ]; then
   fi
 fi
 
-rm -f corpo.json .falhou-*
+rm -f corpo.json "$RAIZ"/.falhou-*
 exit $FALHOU
