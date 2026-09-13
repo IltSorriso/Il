@@ -47,7 +47,10 @@ const partes = [`${noPrazo.length} no prazo`];
 if (vencidos.length) partes.push(`${vencidos.length} vencido(s)`);
 if (semDeclaracao.length) partes.push(`${semDeclaracao.length} sem declaracao`);
 const desc = partes.join(', ').slice(0, 130);
-const estado = (vencidos.length || semDeclaracao.length) ? 'failure' : 'success';
+// SEMPRE success: o ESTADO do compromisso verde quer dizer "o produto está de pé".
+// Dívida de processo vai na DESCRIÇÃO, não na cor — senão o tronco pareceria quebrado
+// (A6) e o vermelho deixaria de significar o que significa.
+const estado = 'success';
 
 if (TOKEN && SHA) {
   const r = await fetch(`https://api.github.com/repos/${DONO}/${REPO}/statuses/${SHA}`, {
