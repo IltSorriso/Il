@@ -82,6 +82,7 @@ theorem diagnostico_none_iff (m : Manifesto) (dep : Deposito) :
       cases h1 : ehHashSha256 m.conteudo <;>
       cases h2 : noDeposito dep m.conteudo <;>
       cases h3 : enderecoConfere dep m.conteudo <;>
+      cases h4 : reuniaoOkB m dep <;>
       simp_all
   | some lic =>
       cases h1 : ehHashSha256 m.conteudo <;>
