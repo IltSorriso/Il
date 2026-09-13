@@ -319,6 +319,62 @@ theorem reuniaoOkB_iff (m : Manifesto) (dep : Deposito) :
           | none         => simp [h, h1, h2]
           | some reunida => simp [h, h1, h2, decide_eq_true_eq]
 
+/- ============ A REGRA DO PRAZO (a declaração A5 como dado) ============ -/
+
+/-- Quatro caracteres são dígitos? — a forma que o check e a prova COMPARTILHAM. -/
+def digitos4 (a b c d : Char) : Bool := a.isDigit && b.isDigit && c.isDigit && d.isDigit
+def Digitos4 (a b c d : Char) : Prop :=
+  ((a.isDigit = true ∧ b.isDigit = true) ∧ c.isDigit = true) ∧ d.isDigit = true
+
+theorem digitos4_iff (a b c d : Char) :
+    digitos4 a b c d = true ↔ Digitos4 a b c d := by
+  simp [digitos4, Digitos4, Bool.and_eq_true]
+
+/-- Dois dígitos como número: `(a - 48) * 10 + (b - 48)`. -/
+def doisDigitos (a b : Char) : Nat := (a.toNat - 48) * 10 + (b.toNat - 48)
+
+/--
+  O PRAZO de uma declaração é uma data `AAAA-MM-DD`? — CHECK EXECUTÁVEL.
+
+  A declaração A5 viveu como PROSA no compromisso, lida por expressão regular: uma
+  regra de máquina morando como texto livre. Como CAMPO de bolha, ela passa a ter
+  FORMA — e forma se recusa.
+-/
+def prazoOk (s : String) : Bool :=
+  match s.toList with
+  | [a, b, c, d, '-', e, f, '-', g, h] =>
+      digitos4 a b c d && digitos4 e f g h
+      && decide (1 ≤ doisDigitos e f ∧ doisDigitos e f ≤ 12)
+      && decide (1 ≤ doisDigitos g h ∧ doisDigitos g h ≤ 31)
+  | _ => false
+
+/-- O prazo é uma data `AAAA-MM-DD`? — ESPECIFICAÇÃO LÓGICA. -/
+def PrazoValido (s : String) : Prop :=
+  match s.toList with
+  | [a, b, c, d, '-', e, f, '-', g, h] =>
+      ((Digitos4 a b c d ∧ Digitos4 e f g h)
+        ∧ (1 ≤ doisDigitos e f ∧ doisDigitos e f ≤ 12))
+        ∧ (1 ≤ doisDigitos g h ∧ doisDigitos g h ≤ 31)
+  | _ => False
+
+/-- REFINAMENTO: o check executável (Bool) ≡ a especificação lógica (Prop). -/
+theorem prazoOk_iff (s : String) : prazoOk s = true ↔ PrazoValido s := by
+  unfold prazoOk PrazoValido
+  split <;> simp_all [digitos4_iff, decide_eq_true_eq]
+
+/-- SÓ a espécie `declaracao` tem prazo a conferir — e é este portão que o diz. -/
+def prazoOkB (m : Manifesto) : Bool :=
+  if m.tipo == "declaracao" then prazoOk ((campo m.campos "prazo").getD "") else true
+
+def PrazoOk (m : Manifesto) : Prop :=
+  m.tipo == "declaracao" = true → PrazoValido ((campo m.campos "prazo").getD "")
+
+theorem prazoOkB_iff (m : Manifesto) : prazoOkB m = true ↔ PrazoOk m := by
+  unfold prazoOkB PrazoOk
+  by_cases h : (m.tipo == "declaracao") = true
+  · simp [h, prazoOk_iff]
+  · simp [h]
+
 /-- Interpreta o texto de uma bolha. Julgáveis são as espécies COM campo de
     conteúdo; as outras não viram manifesto — e o que não vira manifesto não
     recebe veredito. -/
@@ -340,7 +396,7 @@ def manifestoOkB (m : Manifesto) (dep : Deposito) : Bool :=
   | none => false
   | some lic =>
       ehHashSha256 m.conteudo && noDeposito dep m.conteudo
-      && enderecoConfere dep m.conteudo && reuniaoOkB m dep && licencaOk dep lic
+      && enderecoConfere dep m.conteudo && reuniaoOkB m dep && prazoOkB m && licencaOk dep lic
 
 /-- ESPECIFICAÇÃO LÓGICA da validade plena. -/
 def ManifestoValido (m : Manifesto) (dep : Deposito) : Prop :=
@@ -348,7 +404,7 @@ def ManifestoValido (m : Manifesto) (dep : Deposito) : Prop :=
   | none => False
   | some lic =>
       (((ehHashSha256 m.conteudo = true ∧ Presente dep m.conteudo)
-        ∧ EnderecoConfere dep m.conteudo) ∧ ReuniaoOk m dep) ∧ LicencaValida dep lic
+        ∧ EnderecoConfere dep m.conteudo) ∧ ReuniaoOk m dep) ∧ PrazoOk m) ∧ LicencaValida dep lic
 
 /-- REFINAMENTO pleno: o check do manifesto inteiro ≡ a especificação. -/
 theorem manifestoOkB_iff (m : Manifesto) (dep : Deposito) :
@@ -358,7 +414,7 @@ theorem manifestoOkB_iff (m : Manifesto) (dep : Deposito) :
   | none => simp [hp]
   | some lic =>
       simp only [hp, Bool.and_eq_true, noDeposito_iff, enderecoConfere_iff,
-        reuniaoOkB_iff, licencaOk_iff]
+        reuniaoOkB_iff, prazoOkB_iff, licencaOk_iff]
 
 /-- Consequência direta: bolha válida carrega conteúdo endereçado por hash. -/
 theorem valido_implica_conteudo_hash (m : Manifesto) (dep : Deposito)
@@ -366,7 +422,7 @@ theorem valido_implica_conteudo_hash (m : Manifesto) (dep : Deposito)
   unfold ManifestoValido at h
   split at h
   · exact absurd h (by simp)
-  · exact h.1.1.1.1
+  · exact h.1.1.1.1.1
 
 /- ============ O DEPÓSITO INTEIRO (hash de cada objeto) ============ -/
 

@@ -50,11 +50,13 @@ def diagnostico (m : Manifesto) (dep : Deposito) : Option String :=
     if noDeposito dep m.conteudo then
       if enderecoConfere dep m.conteudo then
         if reuniaoOkB m dep then
-          match parseLicenca m.licencaTexto with
-          | none => some "licença nem 'reservado' nem hash sha256"
-          | some lic =>
-              if licencaOk dep lic then none
-              else some "licença inválida (ausente do depósito, endereço não confere, ou não é do tipo licenca)"
+          if prazoOkB m then
+            match parseLicenca m.licencaTexto with
+            | none => some "licença nem 'reservado' nem hash sha256"
+            | some lic =>
+                if licencaOk dep lic then none
+                else some "licença inválida (ausente do depósito, endereço não confere, ou não é do tipo licenca)"
+          else some "o prazo não é uma data AAAA-MM-DD (a declaração A5 tem de ter forma)"
         else some "o campo declarado não é a REUNIÃO das partes, na ordem (ou falta uma parte)"
       else some "o endereço não bate com os bytes do objeto"
     else some "objeto ausente do depósito (endereço quebrado)"
@@ -83,13 +85,15 @@ theorem diagnostico_none_iff (m : Manifesto) (dep : Deposito) :
       cases h2 : noDeposito dep m.conteudo <;>
       cases h3 : enderecoConfere dep m.conteudo <;>
       cases h4 : reuniaoOkB m dep <;>
+      cases h5 : prazoOkB m <;>
       simp_all
   | some lic =>
       cases h1 : ehHashSha256 m.conteudo <;>
       cases h2 : noDeposito dep m.conteudo <;>
       cases h3 : enderecoConfere dep m.conteudo <;>
       cases h4 : reuniaoOkB m dep <;>
-      cases h5 : licencaOk dep lic <;>
+      cases h5 : prazoOkB m <;>
+      cases h6 : licencaOk dep lic <;>
       simp_all
 
 /-- O juiz responde `verificado` exatamente quando o texto é CANÔNICO e o
