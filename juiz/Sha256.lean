@@ -93,6 +93,28 @@ def toHex (b : ByteArray) : String := Id.run do
 /-- SHA-256 hexadecimal do texto (UTF-8). É o ENDEREÇO de um objeto. -/
 def endereco (s : String) : String := toHex (hash s.toUTF8)
 
+/-- SHA-256 hexadecimal dos BYTES. Um objeto de mídia (áudio, imagem, vídeo) e
+    um objeto de texto entram pela MESMA porta: o endereço é o dos bytes. -/
+def enderecoBytes (b : ByteArray) : String := toHex (hash b)
+
+/--
+  A PORTA DOS BYTES JÁ ESTÁ ABERTA — e este teorema é a conta.
+
+  O `endereco` de hoje NÃO é um endereço de texto: é `toHex (hash s.toUTF8)`,
+  isto é, o sha256 dos BYTES que aquele texto ocupa. Logo trocar o depósito de
+  `String` para `ByteArray` **não muda endereço nenhum** dos objetos que já
+  existem — e a canção do ateliê, já endereçada, atravessa a mudança intacta.
+
+  A MÃO (`arreio.py`) sempre trabalhou assim: `gravar_objeto(dados: bytes)`.
+  Quem estava preso ao texto era só o JUIZ — e é isso que este ramo conserta.
+-/
+theorem endereco_eq_enderecoBytes (s : String) :
+    endereco s = enderecoBytes s.toUTF8 := rfl
+
+-- A ponte, sobre um caso real: o texto vazio (vetor FIPS).
+example : enderecoBytes "".toUTF8
+    = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" := by native_decide
+
 /- ============ TDD: vetores oficiais (FIPS 180-4) ============ -/
 -- vazio
 example : endereco "" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" := by native_decide
