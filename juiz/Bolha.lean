@@ -367,7 +367,7 @@ def prazoOkB (m : Manifesto) : Bool :=
   if m.tipo == "declaracao" then prazoOk ((campo m.campos "prazo").getD "") else true
 
 def PrazoOk (m : Manifesto) : Prop :=
-  m.tipo == "declaracao" = true → PrazoValido ((campo m.campos "prazo").getD "")
+  (m.tipo == "declaracao") = true → PrazoValido ((campo m.campos "prazo").getD "")
 
 theorem prazoOkB_iff (m : Manifesto) : prazoOkB m = true ↔ PrazoOk m := by
   unfold prazoOkB PrazoOk
