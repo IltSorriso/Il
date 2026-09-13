@@ -110,8 +110,13 @@ if [ "$PUBLICAR" = "1" ]; then
     [ -n "$NUM_JUIZ" ] && publicar "juiz - numero" "$NUM_JUIZ"
     [ -n "$NUM_PROSA" ] && publicar "prosa - numero" "$NUM_PROSA"
     if [ "$FALHOU" != "0" ]; then
+      # A ORDEM DA CADEIA, e nao a ordem alfabetica do glob. "conformidade" vem antes de
+      # "ponte" e de "spec-bolha" no alfabeto, e por isso o canal publicava a CONSEQUENCIA
+      # (falta o Ponte.olean) em vez da CAUSA (o erro que quebrou o Bolha.lean).
       alvo=""; passo="desconhecido"
-      for f in "$RAIZ"/.falhou-*; do if [ -e "$f" ]; then alvo="$f"; passo="${f#$RAIZ/.falhou-}"; break; fi; done
+      for cand in versao-do-lean hash-sha256 spec-bolha ponte mao-escreve-a-cancao conformidade higiene-da-prosa; do
+        if [ -e "$RAIZ/.falhou-$cand" ]; then alvo="$RAIZ/.falhou-$cand"; passo="$cand"; break; fi
+      done
       if [ -n "$alvo" ]; then arq="$RAIZ/prova-$passo.txt"; else arq=$(ls -t "$RAIZ"/prova-*.txt 2>/dev/null | head -1); fi
       # A PRIMEIRA linha de erro e' a que diz o defeito; as ultimas linhas de um
       # compilador sao o eco dele.
