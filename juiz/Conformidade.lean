@@ -186,6 +186,43 @@ def main : IO UInt32 := do
         IO.println s!"  {especie}: tem campo de conteúdo, mas não está no registro de espécies"
         falhas := falhas + 1
 
+
+  IO.println "--- A FORMA DO TEXTO (a porta de uma mão do texto canônico) ---"
+  let mut textosConferidos := 0
+  for (h, txt) in bom ++ instancia do
+    match tipoDe txt with
+    | none => pure ()
+    | some t =>
+        match List.lookup t registroConteudo with
+        | none => pure ()
+        | some chave =>
+            match campo (parseCampos txt) chave with
+            | none => pure ()
+            | some enderecoConteudo =>
+                total := total + 1
+                textosConferidos := textosConferidos + 1
+                match objeto dep enderecoConteudo with
+                | none =>
+                    IO.println s!"  {h.take 12}… o texto apontado NÃO está no depósito"
+                    falhas := falhas + 1
+                | some corpo =>
+                    if textoOk corpo then
+                      IO.println s!"  {h.take 12}… texto canônico ({corpo.length} caracteres)"
+                    else
+                      IO.println s!"  {h.take 12}… TEXTO FORA DA FORMA CANÔNICA — outra grafia, outro endereço"
+                      falhas := falhas + 1
+  if textosConferidos == 0 then
+    IO.println "  nenhum texto a conferir neste depósito (dito em voz alta)"
+
+  IO.println "--- CANÔNICO? (teste negativo: acento decomposto) ---"
+  total := total + 1
+  let decomposto := "cano\u{0302}nico"
+  if textoOk decomposto then
+    IO.println "  ERRO: texto com acento decomposto passou como canônico"
+    falhas := falhas + 1
+  else
+    IO.println "  acento decomposto → corretamente recusado (outra grafia, outro endereço)"
+
   IO.println s!"\n{total} conferências, {falhas} falhas"
 
 
