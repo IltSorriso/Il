@@ -468,7 +468,7 @@ theorem depositoEnderecado_iff (dep : Deposito) :
     uma parte muda o endereço DELA — e só dela.
 -/
 def registroEspecies : List (String × List String) :=
-  [ ("licenca",  ["tipo", "catalogo", "nome"]),
+  [ ("licenca",  ["tipo", "catalogo", "nome", "sigilo"]),
     ("anotacao", ["tipo", "conteudo", "licenca"]),
     ("musica",   ["tipo", "titulo", "interprete", "letra", "partes", "licenca"]),
     ("parte",    ["tipo", "numero", "papel", "letra", "licenca"]),
