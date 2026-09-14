@@ -1,0 +1,24 @@
+A pergunta: o vocabulário do juiz vira BOLHA?
+
+Hoje registroEspecies, registroConteudo e registroReuniao vivem como lista literal
+dentro de Bolha.lean. Acrescentar uma ESPÉCIE já provamos que é barato — a
+declaracao entrou sem tocar em espécie nenhuma. Mas acrescentar uma PROPRIEDADE a
+uma espécie não é barato: exige mexer no tipo em Lean. licenca_exigida e morada
+são as duas primeiras, e não serão as últimas.
+
+A proposta: campo, especie e vocabulario viram objetos do depósito, endereçados
+como qualquer outra bolha. Acrescentar espécie vira DEPOSITAR. Acrescentar
+propriedade vira DEPOSITAR.
+
+A DECISÃO CENTRAL DESTE RAMO: o que NÃO pode virar bolha é o LEITOR. O que lê uma
+bolha não pode ser uma bolha, senão não há por onde começar. Ficam no Lean, e só
+eles: parseCampos, linhaCanonica, serializarCampos e o endereço (sha256). Tudo o
+que está ACIMA do leitor passa a ser dado.
+
+O QUE SE GANHA, além do custo: a linguagem ganha ENDEREÇO e portanto VERSÃO —
+uma bolha poderá declarar em que vocabulário foi escrita. E a natureza de um
+campo (literal, texto, reuniao, derivacao, referencia) deixa de estar espalhada em
+registros separados e passa a ser UM campo, declarado no próprio campo.
+
+Critério de descarte: se o vocabulário em bolha exigir, para funcionar, que o
+leitor mude a cada espécie nova, então o ganho era ilusório e o ramo morre.
