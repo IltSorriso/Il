@@ -476,8 +476,8 @@ def registroEspecies : List (String × List String) :=
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.
-    ("campo",        ["tipo", "nome", "natureza", "licenca"]),
-    ("especie",      ["tipo", "nome", "campos", "licenca"]),
+    ("campo",        ["tipo", "nome", "relacao", "licenca"]),
+    ("especie",      ["tipo", "nome", "campos", "conteudo", "morada", "licenca_exigida", "licenca"]),
     ("caminho",      ["tipo", "nome", "padrao", "licenca"]),
     ("vocabulario",  ["tipo", "nome", "especies", "caminhos", "licenca"]) ]
 
