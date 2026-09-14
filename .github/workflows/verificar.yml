@@ -30,6 +30,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash ferramentas/reproduzir-cadeia.sh --etapa juiz --publicar
+      - name: A conta por dentro (a decomposição do número)
+        # O NÚMERO SOZINHO É CAIXA PRETA. 104 conferências não dizem de onde
+        # vieram, e número que ninguém consegue decompor não é auditável. A
+        # cadeia já grava cada prova em prova-<etapa>.txt — aqui ela é DITA EM
+        # VOZ ALTA. Isto é observabilidade, não prova: quem prova é o juiz.
+        if: always()
+        run: |
+          for arq in prova-*.txt; do
+            [ -e "$arq" ] || continue
+            echo "===== $arq ====="
+            cat "$arq"
+            echo
+          done
+
+      - name: Guardar as provas
+        # Artefato é o que sobra depois que o log rola. Enquanto o número não
+        # for decomponível DENTRO do juiz, o arquivo cru é a única testemunha.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provas-do-juiz
+          path: prova-*.txt
+          if-no-files-found: warn
 
   prazos:
     # A5 cobrada por máquina. Publica ESTADO e não derruba o tronco: a A6 manda o
