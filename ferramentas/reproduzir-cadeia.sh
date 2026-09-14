@@ -86,6 +86,16 @@ echo "=== NÚMEROS ==="
 [ -n "$NUM_PROSA" ] && echo "  prosa: $NUM_PROSA"
 [ -z "$NUM_JUIZ$NUM_PROSA" ] && echo "  (nenhum número — a cadeia não chegou ao fim)"
 
+# O RÓTULO e o DESTINO da prova são configuráveis por ambiente — e é isso que
+# permite ao ATELIÊ publicar o número dele no TRONCO, sem colidir com o número do
+# tronco. Sem rótulo próprio, dois valores diferentes viveriam sob o mesmo nome no
+# mesmo compromisso: contradição, não imprecisão.
+#
+#   PROVA_ROTULO_JUIZ / PROVA_ROTULO_PROSA — o nome do contexto
+#   GITHUB_REPOSITORY / GITHUB_SHA         — o destino (já lidos abaixo)
+ROTULO_JUIZ="${PROVA_ROTULO_JUIZ:-juiz - numero}"
+ROTULO_PROSA="${PROVA_ROTULO_PROSA:-prosa - numero}"
+
 publicar() {   # publicar <contexto-base> <descrição>
   local base="$1" desc="$2" ctx
   if [ "$EM_CI" = "1" ]; then ctx="$base"; else ctx="$base [$MAQUINA]"; fi
@@ -107,8 +117,8 @@ if [ "$PUBLICAR" = "1" ]; then
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     echo "  PUBLICAR pedido, mas sem GITHUB_TOKEN — nada publicado."
   else
-    [ -n "$NUM_JUIZ" ] && publicar "juiz - numero" "$NUM_JUIZ"
-    [ -n "$NUM_PROSA" ] && publicar "prosa - numero" "$NUM_PROSA"
+    [ -n "$NUM_JUIZ" ] && publicar "$ROTULO_JUIZ" "$NUM_JUIZ"
+    [ -n "$NUM_PROSA" ] && publicar "$ROTULO_PROSA" "$NUM_PROSA"
     if [ "$FALHOU" != "0" ]; then
       # A ORDEM DA CADEIA, e nao a ordem alfabetica do glob. "conformidade" vem antes de
       # "ponte" e de "spec-bolha" no alfabeto, e por isso o canal publicava a CONSEQUENCIA
