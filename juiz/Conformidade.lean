@@ -189,6 +189,27 @@ def main : IO UInt32 := do
         IO.println s!"  {especie}: tem campo de conteúdo, mas não está no registro de espécies"
         falhas := falhas + 1
 
+  IO.println "--- O VOCABULÁRIO LIDO CONCORDA COM O REGISTRO LITERAL? ---"
+  -- O registro literal é o ESPERADO; o vocabulário lido é o OBTIDO. O veredito é
+  -- a comparação — a migração vira teste, não fé de que os dois concordam.
+  match lerVocabulario (bom ++ instancia) with
+  | none =>
+      IO.println "  o depósito não tem EXATAMENTE UM vocabulário legível — nada a comparar"
+      falhas := falhas + 1
+  | some pares =>
+      for (nome, chaves) in pares do
+        total := total + 1
+        match List.lookup nome registroEspecies with
+        | none =>
+            IO.println s!"  {nome}: está no vocabulário e NÃO está no registro literal"
+            falhas := falhas + 1
+        | some esperadas =>
+            if chaves == esperadas then
+              IO.println s!"  {nome}: idêntico ({chaves.length} campos)"
+            else
+              IO.println s!"  {nome}: DIFERENTE — o vocabulário diz {chaves}, o registro diz {esperadas}"
+              falhas := falhas + 1
+
 
   IO.println "--- A FORMA DO TEXTO (a porta de uma mão do texto canônico) ---"
   let mut textosConferidos := 0

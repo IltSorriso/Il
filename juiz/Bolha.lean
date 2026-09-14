@@ -255,6 +255,48 @@ def enderecosDeCampo (cs : List (String × String)) (chave : String) : List Stri
   | some s => (s.splitOn ",").filter (fun h => h != "")
   | none   => []
 
+/- ============ O LEITOR DO VOCABULÁRIO (fatia "v", passo 1) ============ -/
+
+/-- Os endereços do depósito cujo `tipo` é o pedido. -/
+def objetosDeTipo (dep : Deposito) (t : String) : List String :=
+  (dep.filter (fun p => objTipo dep p.1 == some t)).map (fun p => p.1)
+
+/-- O `nome` de um objeto `campo`. -/
+def nomeDoCampo (dep : Deposito) (h : String) : String :=
+  match objetoTexto dep h with
+  | some t => (campo (parseCampos t) "nome").getD ""
+  | none   => ""
+
+/-- Os NOMES dos `campo` citados por uma `especie`, na ORDEM em que ela os cita.
+    `none` se o objeto não é legível, não é uma `especie`, ou se algum endereço
+    citado não resolve para um `campo` — a natureza `referencia` exige que o
+    endereço RESOLVA, e a ordem É a forma canônica. -/
+def camposDaEspecie (dep : Deposito) (h : String) : Option (List String) :=
+  match objetoTexto dep h with
+  | none => none
+  | some txt =>
+      if tipoDe txt == some "especie" then
+        let hs := enderecosDeCampo (parseCampos txt) "campos"
+        if hs.all (fun k => objTipo dep k == some "campo") then
+          some (hs.map (nomeDoCampo dep))
+        else none
+      else none
+
+/-- O VOCABULÁRIO INTEIRO, LIDO DO DEPÓSITO: espécie -> campos, na ordem.
+    `none` se o depósito não tem EXATAMENTE UM vocabulário legível.
+    Zero é erro; dois é ambiguidade. É o depósito que declara o seu vocabulário.
+    Este leitor NÃO substitui o registro literal: ele existe AO LADO dele, para
+    que os dois possam ser COMPARADOS antes de qualquer troca. -/
+def lerVocabulario (dep : Deposito) : Option (List (String × List String)) :=
+  match objetosDeTipo dep "vocabulario" with
+  | [h] =>
+      match objetoTexto dep h with
+      | none => none
+      | some txt =>
+          some ((enderecosDeCampo (parseCampos txt) "especies").map
+            (fun he => (nomeDoCampo dep he, (camposDaEspecie dep he).getD [])))
+  | _ => none
+
 /-- A CONTRIBUIÇÃO de uma parte: o objeto apontado pelo CAMPO DE CONTEÚDO da
     bolha que aquele endereço nomeia. É o que torna a regra GERAL — a parte não
     precisa ser de uma espécie específica; precisa ser uma bolha julgável. -/
