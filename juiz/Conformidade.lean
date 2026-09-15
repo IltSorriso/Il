@@ -30,7 +30,7 @@ def lerDeposito (dir : String) : IO Deposito := do
 def textoDe (b : ByteArray) : String := (String.fromUTF8? b).getD ""
 
 /-- Lê um depósito OPCIONAL — distinguindo AUSENTE de PRESENTE.
-    Ausência é legítima (o tronco só tem `exemplos/`). O que não é legítimo é o
+    Ausência é legítima (a pindorama só tem `exemplos/`). O que não é legítimo é o
     silêncio: um erro que não seja ausência é PROPAGADO, não engolido —
     falha por erro, nunca por omissão. -/
 def lerDepositoOpcional (dir : String) : IO (Option Deposito) := do

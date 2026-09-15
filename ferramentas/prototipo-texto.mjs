@@ -76,7 +76,7 @@ const casos = [];
 const add = (nome, texto, canonico) => casos.push({ nome, texto, canonico });
 // reais
 add('real: prosa do ateliê', 'Primeira anotação da Linguagem-Bolha — importada pela mão, marcada como uso-privado.', true);
-add('real: prosa do tronco', 'Exemplo canônico da Linguagem-Bolha — uma anotação de verdade.\n', true);
+add('real: prosa da pindorama', 'Exemplo canônico da Linguagem-Bolha — uma anotação de verdade.\n', true);
 // hostis: mesma coisa, outra grafia
 add('HOSTIL pt NFD', 'cano\u0302nico e anotac\u0327a\u0303o', false);
 add('HOSTIL grego NFD', '\u03B1\u0301\u03B2\u03B3', false);

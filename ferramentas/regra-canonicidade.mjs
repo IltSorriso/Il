@@ -133,8 +133,8 @@ console.log('  pares em que a verificação rápida NÃO DECIDE:', talvez, 'de',
 
 console.log('\n═══ 4. ATRITO EM TEXTO REAL ═══');
 const arquivos = [
-  [process.env.HOME + '/projetos/il-final/README.md', 'capa do tronco'],
-  [process.env.HOME + '/projetos/il-final/exemplos/musica/letra.txt', 'letra de música (tronco)'],
+  [process.env.HOME + '/projetos/il-final/README.md', 'capa da pindorama'],
+  [process.env.HOME + '/projetos/il-final/exemplos/musica/letra.txt', 'letra de música (pindorama)'],
   [process.env.HOME + '/projetos/IltS/conversa/PLANO.md', 'contrato (ateliê)'],
   [process.env.HOME + '/projetos/IltS/conversa/Bolha.md', 'diário (ateliê)'],
 ];

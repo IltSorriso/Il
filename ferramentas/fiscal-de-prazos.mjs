@@ -1,6 +1,6 @@
 // fiscal-de-prazos.mjs — cobra a A5: ramo sem declaração de prazo, ou prazo vencido.
 //
-// NÃO derruba o tronco. A A6 manda o tronco nunca quebrar, e ramo vencido não é
+// NÃO derruba a pindorama. A A6 manda a pindorama nunca quebrar, e ramo vencido não é
 // defeito do produto — é dívida de processo. Logo ele PUBLICA ESTADO e sai com 0.
 //
 // A declaração A5 vive no compromisso (é onde o contrato a pede):
@@ -59,7 +59,7 @@ for (const b of ramos) {
 }
 
 const fora = ramos.filter((b) => b.name !== repo.default_branch);
-console.log(`ramos fora do tronco: ${fora.length}`);
+console.log(`ramos fora da pindorama: ${fora.length}`);
 if (noPrazo.length) console.log('  no prazo: ' + noPrazo.join(' | '));
 if (vencidos.length) console.log('  VENCIDOS: ' + vencidos.join(' | '));
 if (semDeclaracao.length) console.log('  SEM DECLARAÇÃO DE PRAZO: ' + semDeclaracao.join(' | '));
@@ -70,13 +70,13 @@ if (vencidos.length) partes.push(`${vencidos.length} vencido(s)`);
 if (semDeclaracao.length) partes.push(`${semDeclaracao.length} sem declaracao`);
 const desc = partes.join(', ').slice(0, 130);
 // SEMPRE success: o ESTADO do compromisso verde quer dizer "o produto está de pé".
-// Dívida de processo vai na DESCRIÇÃO, não na cor — senão o tronco pareceria quebrado
+// Dívida de processo vai na DESCRIÇÃO, não na cor — senão a pindorama pareceria quebrado
 // (A6) e o vermelho deixaria de significar o que significa.
 const estado = 'success';
 
 // ─── A SEGUNDA DÍVIDA: O DIÁRIO ATRÁS DO TRABALHO ─────────────────────────
 // O contrato já admite a sombra: "o diário fica para trás". Aqui ela vira número.
-// O diário vive no ATELIÊ (privado); no tronco não existe, e isso é dito em voz alta.
+// O diário vive no ATELIÊ (privado); na pindorama não existe, e isso é dito em voz alta.
 const DIARIO = "conversa/Bolha.md";
 let diarioAtraso = null;
 if (fsExists(DIARIO)) {

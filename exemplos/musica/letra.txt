@@ -1,4 +1,4 @@
-# CANÇÃO DE EXEMPLO — produto do tronco, sem conteúdo de ninguém.
+# CANÇÃO DE EXEMPLO — produto da pindorama, sem conteúdo de ninguém.
 # A letra entra pela mão: um arquivo texto com as partes marcadas por [Nome].
 # Recado antes do primeiro marcador (linha começando por #) não é letra.
 

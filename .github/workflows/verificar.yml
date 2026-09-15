@@ -55,8 +55,8 @@ jobs:
           if-no-files-found: warn
 
   prazos:
-    # A5 cobrada por máquina. Publica ESTADO e não derruba o tronco: a A6 manda o
-    # tronco nunca quebrar, e ramo vencido é dívida de processo, não defeito do produto.
+    # A5 cobrada por máquina. Publica ESTADO e não derruba a pindorama: a A6 manda o
+    # pindorama nunca quebrar, e ramo vencido é dívida de processo, não defeito do produto.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

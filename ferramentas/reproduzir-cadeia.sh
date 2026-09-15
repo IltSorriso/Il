@@ -87,8 +87,8 @@ echo "=== NÚMEROS ==="
 [ -z "$NUM_JUIZ$NUM_PROSA" ] && echo "  (nenhum número — a cadeia não chegou ao fim)"
 
 # O RÓTULO e o DESTINO da prova são configuráveis por ambiente — e é isso que
-# permite ao ATELIÊ publicar o número dele no TRONCO, sem colidir com o número do
-# tronco. Sem rótulo próprio, dois valores diferentes viveriam sob o mesmo nome no
+# permite ao ATELIÊ publicar o número dele na PINDORAMA, sem colidir com o número do
+# pindorama. Sem rótulo próprio, dois valores diferentes viveriam sob o mesmo nome no
 # mesmo compromisso: contradição, não imprecisão.
 #
 #   PROVA_ROTULO_JUIZ / PROVA_ROTULO_PROSA — o nome do contexto

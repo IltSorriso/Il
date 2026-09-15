@@ -28,8 +28,8 @@ const end = (b) => createHash('sha256').update(b).digest('hex');
 const tipoDe = (txt) => (txt.match(/^tipo:\s*(\S+)/m) || [])[1] || null;
 
 const ONDE = [
-  ['tronco', C + '/projetos/il-final/exemplos/deposito/objetos'],
-  ['tronco/quebrados', C + '/projetos/il-final/exemplos/quebrados/objetos'],
+  ['pindorama', C + '/projetos/il-final/exemplos/deposito/objetos'],
+  ['pindorama/quebrados', C + '/projetos/il-final/exemplos/quebrados/objetos'],
   ['ateliê', C + '/projetos/IltS/deposito/objetos'],
 ];
 const JANELAS = [C + '/projetos/IltS/bolhas'];
