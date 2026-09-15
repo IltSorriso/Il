@@ -72,6 +72,13 @@ def main : IO UInt32 := do
   let instancia? ← lerDepositoOpcional "deposito/objetos"
   let instancia := instancia?.getD []
   let dep := bom ++ queb ++ instancia
+  -- (c) A PROCEDENCIA. `bom ++ queb ++ instancia` apaga de ONDE cada objeto veio,
+  -- e sem isso a lei escrita no Bolha.md (2026-09-13) nao tem por onde olhar:
+  -- quem decide e o RECIPIENTE, e o recipiente e o caminho.
+  let origens : List (String × Deposito) :=
+    [ ("exemplos/deposito/objetos", bom),
+      ("exemplos/quebrados/objetos", queb),
+      ("deposito/objetos", instancia) ]
   let mut falhas := 0
   let mut total := 0
 
@@ -90,6 +97,40 @@ def main : IO UInt32 := do
       IO.println s!"  {h.take 12}… NÃO CONFERE (recalculado {recalc.take 12}…)"
       falhas := falhas + 1
   IO.println s!"  depósito inteiro endereçado? {depositoEnderecado dep}"
+
+  IO.println "\n--- A LEI: bolha privada nao mora em caminho publico ---"
+  -- O sigilo do RECIPIENTE vem da bolha `caminho` do canone — lida, nao repetida
+  -- como texto literal. E o sigilo da BOLHA vem da licenca dela.
+  let caminhoCom (padrao : String) : Option String :=
+    (objetosDeTipo bom "caminho").find? (fun h =>
+      match objetoTexto bom h with
+      | some txt => (campo (parseCampos txt) "padrao").getD "" == padrao
+      | none     => false)
+  let sigiloDoCaminho (padrao : String) : Option String :=
+    (caminhoCom padrao).bind (fun h =>
+      campo (parseCampos ((objetoTexto bom h).getD "")) "sigilo")
+  for (caminho, objs) in origens do
+    match sigiloDoCaminho caminho with
+    | none =>
+      IO.println s!"  {caminho}: NAO DECLARADO em bolha `caminho` — sigilo desconhecido"
+    | some sc =>
+      IO.println s!"  {caminho}: `sigilo: {sc}` — {objs.length} objeto(s)"
+      for (h, bytes) in objs do
+        match campo (parseCampos (textoDe bytes)) "licenca" with
+        | some lic =>
+          if lic.length == 64 then
+            total := total + 1
+            let sig := match objetoTexto objs lic with
+              | some lt => (campo (parseCampos lt) "sigilo").getD "(sem sigilo)"
+              | none    => "(licenca ausente neste deposito)"
+            if sc == "publico" && sig == "privado" then
+              IO.println s!"    {h.take 12}… FALHA: bolha privada em caminho publico"
+              falhas := falhas + 1
+            else
+              IO.println s!"    {h.take 12}… concorda (licenca: {sig})"
+          else
+            pure ()
+        | none => pure ()
 
   IO.println "--- DEVEM verificar ---"
   for (h, bytes) in bom ++ instancia do
