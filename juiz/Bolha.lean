@@ -520,7 +520,7 @@ def registroEspecies : List (String × List String) :=
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.
     ("campo",        ["tipo", "nome", "relacao", "licenca"]),
     ("especie",      ["tipo", "nome", "campos", "conteudo", "licenca_exigida", "licenca"]),
-    ("caminho",      ["tipo", "nome", "padrao", "licenca"]),
+    ("caminho",      ["tipo", "nome", "padrao", "sigilo", "licenca"]),
     ("vocabulario",  ["tipo", "nome", "especies", "caminhos", "licenca"]) ]
 
 /--
