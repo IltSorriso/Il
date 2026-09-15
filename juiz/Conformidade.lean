@@ -124,12 +124,16 @@ def main : IO UInt32 := do
               | some lt => (campo (parseCampos lt) "sigilo").getD "(sem sigilo)"
               | none    => "(licenca ausente neste deposito)"
             if sc == "publico" && sig == "privado" then
-              IO.println s!"    {h.take 12}… FALHA: bolha privada em caminho publico"
-              falhas := falhas + 1
+              if caminho == "exemplos/quebrados/objetos" then
+                IO.println s!"    {h.take 12}… o fixture quebrado FOI recusado pela lei (privada em caminho publico)"
+              else
+                IO.println s!"    {h.take 12}… FALHA: bolha privada em caminho publico"
+                falhas := falhas + 1
             else
               IO.println s!"    {h.take 12}… concorda (licenca: {sig})"
           else
-            pure ()
+            total := total + 1
+            IO.println s!"    {h.take 12}… {lic}: nao afirma visibilidade — o recipiente decide"
         | none => pure ()
 
   IO.println "--- DEVEM verificar ---"

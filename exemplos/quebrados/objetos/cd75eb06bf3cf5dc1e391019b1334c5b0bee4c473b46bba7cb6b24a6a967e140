@@ -1,0 +1,5 @@
+tipo: caminho
+nome: fixture-teste-negativo
+padrao: exemplos/quebrados/objetos
+sigilo: publico
+licenca: ec7397513e87e015b5cb95a4d64bfad7a1e9589c6ebe2109a9566928dd7c07eb
