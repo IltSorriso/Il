@@ -273,6 +273,86 @@ def fluxo_musica(args):
     return 0
 
 
+
+# --- A VISTA: bolhas/ e PROJECAO do deposito, nunca fonte -------------------
+# O nome de cada janela e FUNCAO dos campos do proprio objeto. Foi medido: 18 de
+# 18 janelas dos dois repositorios tem nome derivavel assim, e os seus bytes sao
+# copia byte-a-byte de um objeto do deposito sob o proprio sha256. Por isso a
+# janela pode morrer e voltar: e' projecao.
+JANELA = {
+    "parte":    lambda c: f"parte-{int(c['numero']):02d}-{c['letra'][:12]}",
+    "anotacao": lambda c: f"anotacao-{c['conteudo'][:12]}",
+    "musica":   lambda c: f"musica-{slug(c['titulo'])}",
+    "licenca":  lambda c: f"licenca-{c['catalogo']}-{c['nome']}",
+}
+
+
+def slug(texto: str) -> str:
+    """O rotulo legivel de uma janela: sem acento, minusculo, espaco vira hifen."""
+    t = sem_acento(texto).lower()
+    return "-".join("".join(ch if ch.isalnum() else " " for ch in t).split())
+
+
+def campos_de(texto: str) -> dict:
+    """Le os campos de um objeto. NAO valida: quem valida e' o juiz."""
+    campos = {}
+    for linha in texto.split("\n"):
+        if not linha.strip() or ":" not in linha:
+            continue
+        k, _, v = linha.partition(":")
+        campos[k.strip()] = v.strip()
+    return campos
+
+
+def nome_da_janela(texto: str):
+    """O nome da janela, ou None se a especie nao tem convencao (conteudo nao tem)."""
+    c = campos_de(texto)
+    f = JANELA.get(c.get("tipo"))
+    if not f:
+        return None
+    try:
+        return f(c)
+    except Exception:
+        return None
+
+
+def regenerar_janelas(argv):
+    """Reconstroi bolhas/ a partir do deposito — a vista e' projecao, nunca fonte."""
+    dep = DEPOSITO
+    if len(argv) > 1 and argv[0] == "--de":
+        dep = argv[1]
+    if not os.path.isdir(dep):
+        print(f"nao ha deposito em {dep}")
+        return 1
+    os.makedirs(BOLHAS, exist_ok=True)
+    escritas = iguais = sem_nome = 0
+    for h in sorted(os.listdir(dep)):
+        p = os.path.join(dep, h)
+        if not os.path.isfile(p):
+            continue
+        dados = open(p, "rb").read()
+        try:
+            texto = dados.decode("utf-8")
+        except UnicodeDecodeError:
+            sem_nome += 1
+            continue
+        nome = nome_da_janela(texto)
+        if not nome:
+            sem_nome += 1
+            continue
+        destino = os.path.join(BOLHAS, nome + ".bolha")
+        if os.path.exists(destino) and open(destino, "rb").read() == dados:
+            iguais += 1
+            continue
+        with open(destino, "w", encoding="utf-8") as f:
+            f.write(texto)
+        escritas += 1
+        print(f"  {nome}.bolha  <-  {h[:12]}...")
+    print(f"\njanelas: {escritas} escritas · {iguais} ja identicas · {sem_nome} sem janela")
+    print("a vista e projecao do deposito — nunca fonte.")
+    return 0
+
+
 def main():
     os.makedirs(DEPOSITO, exist_ok=True)
     os.makedirs(BOLHAS, exist_ok=True)
@@ -280,6 +360,10 @@ def main():
     # O FLUXO DA MÚSICA, quando pedido: `arreio.py musica <letra.txt> ...`
     if len(sys.argv) > 1 and sys.argv[1] == "musica":
         return fluxo_musica(sys.argv[2:])
+
+    # A VISTA, quando pedido: `arreio.py janelas [--de <deposito>]`
+    if len(sys.argv) > 1 and sys.argv[1] == "janelas":
+        return regenerar_janelas(sys.argv[2:])
 
     print("=== BOLHA-LICENÇA (catálogo real) ===")
     h_cc0 = criar_bolha_licenca("CC", "CC0-1.0")
