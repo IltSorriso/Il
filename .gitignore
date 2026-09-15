@@ -5,9 +5,8 @@ __pycache__/
 # gerado por higiene.py — nunca versionado (senao vira sombra e conflita entre os repos)
 MAPA.md
 
-# gerado pela cadeia (arreio.py / reproduzir-cadeia.sh) — mesma regra.
-# ANCORADOS na raiz de proposito: sem a barra inicial, `deposito/` engoliria
-# tambem `exemplos/deposito/`, que e' o CANONE versionado. Ancorar protege o canon.
-/deposito/
-/bolhas/
+# gerado pela cadeia. ATENCAO: `deposito/` e `bolhas/` NAO entram aqui — no atelie
+# essas duas pastas sao o CONTEUDO versionado, e ignora-las ali desligaria a
+# versionagem do acervo em silencio. Neste repositorio elas sao so lixo de execucao,
+# e por isso a regra vive em .git/info/exclude (local, nao compartilhado).
 /prova-*.txt
