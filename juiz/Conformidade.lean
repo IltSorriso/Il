@@ -136,6 +136,42 @@ def main : IO UInt32 := do
             IO.println s!"    {h.take 12}… {lic}: nao afirma visibilidade — o recipiente decide"
         | none => pure ()
 
+  IO.println "\n--- O DIREITO EXIGIDO POR ESPECIE (licenca_exigida, ate agora nunca lida) ---"
+  let especieCom (nome : String) : Option String :=
+    (objetosDeTipo bom "especie").find? (fun h =>
+      match objetoTexto bom h with
+      | some txt => (campo (parseCampos txt) "nome").getD "" == nome
+      | none     => false)
+  let exigidaDe (nome : String) : Option String :=
+    (especieCom nome).bind (fun h =>
+      campo (parseCampos ((objetoTexto bom h).getD "")) "licenca_exigida")
+  let comOrigem := origens.foldr (fun (c, os) acc => os.map (fun (h, b) => (c, h, b)) ++ acc) []
+  for (caminho, h, bytes) in comOrigem do
+    let txt := textoDe bytes
+    match tipoDe txt with
+    | none => pure ()
+    | some tp =>
+      total := total + 1
+      let lic := campo (parseCampos txt) "licenca"
+      let exig := exigidaDe tp
+      let ex := exig.getD "?"
+      let ok :=
+        if ex == "livre" then lic.isSome && (lic.getD "").length == 64
+        else if ex == "livre_ou_reservado" then
+          lic.isSome && ((lic.getD "").length == 64 || lic.getD "" == "reservado")
+        else if ex == "sem_licenca" then lic.isNone
+        else true
+      if exig.isNone then
+        IO.println s!"  {h.take 12}… a especie `{tp}` nao declara licenca_exigida (dito em voz alta)"
+      else if ok then
+        IO.println s!"  {h.take 12}… `{tp}` exige `{ex}`: satisfaz"
+      else
+        if caminho == "exemplos/quebrados/objetos" then
+          IO.println s!"  {h.take 12}… o fixture quebrado FOI recusado (`{tp}` exige `{ex}`)"
+        else
+          IO.println s!"  {h.take 12}… FALHA: `{tp}` exige `{ex}`, e a licenca e {lic.getD "(ausente)"}"
+          falhas := falhas + 1
+
   IO.println "--- DEVEM verificar ---"
   for (h, bytes) in bom ++ instancia do
     let txt := textoDe bytes

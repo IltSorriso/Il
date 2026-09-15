@@ -1,0 +1,5 @@
+tipo: caminho
+nome: fixture-licenca-exigida
+padrao: exemplos/quebrados/objetos
+sigilo: publico
+licenca: reservado
