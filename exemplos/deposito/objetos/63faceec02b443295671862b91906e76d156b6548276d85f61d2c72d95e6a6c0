@@ -1,0 +1,42 @@
+A pergunta: o RECIPIENTE declara a propria visibilidade, e o juiz LE?
+
+Hoje o canone ja declara o recipiente — duas bolhas de especie caminho:
+
+  nome: exemplos    padrao: exemplos/deposito/objetos
+  nome: deposito    padrao: deposito/objetos
+
+A segunda declara o acervo privado do atelie. E NADA le nenhuma das duas:
+Conformidade.lean:70-72 repete os mesmos tres caminhos como texto literal, e a
+linha 73 funde os tres depositos numa lista plana — depois dela a procedencia de
+cada objeto morreu. Tambem licenca_exigida (9 bolhas) e a bolha vocabulario
+(de997da24b, 0 referencias) estao declaradas e nao sao lidas.
+
+A LEI JA ESTA ESCRITA (Bolha.md, 2026-09-13): bolha com sigilo privado nao pode
+morar em deposito publico. O recipiente decide; a licenca so pode concordar. Mas
+a lei tem os dois termos soltos: as 16 bolhas reservadas do corpus nao carregam
+sigilo, porque reservado e um ESTADO e nao uma bolha (README.md:13). Medido: eu
+poderia commitar o acervo privado dentro do canone publico e a conferencia
+imprimiria 0 falhas. A lei nasce morta onde foi escrita para proteger.
+
+A proposta: a especie caminho ganha o campo sigilo — a visibilidade dos bytes que
+moram naquele padrao. Mesmo nome do campo da licenca, e mesmo significado (se os
+bytes podem ser vistos), com outro SUJEITO. O precedente e do proprio projeto: o
+campo conteudo aparece duas vezes, com relacoes diferentes, e o Bolha.md:578 diz
+que esta certo.
+
+E o juiz passa a LER os caminhos em vez de repete-los, carregando os pares
+(deposito, objetos) para que a procedencia nao morra na linha 73.
+
+Custo medido: 4 enderecos, e a cascata TERMINA — o vocabulario tem 0 referencias.
+O campo sigilo JA EXISTE (7c9eb4f2, relacao nenhuma) e e reusado.
+
+NATUREZA DA MUDANCA, dita sem enfeite: caminho esta entre as quatro especies que o
+proprio juiz declara morarem no Lean para sempre (Bolha.lean:518-520), porque sao
+O LEITOR. Isto nao e acrescento de dado — e mudanca do leitor. Por isso este ramo
+tem prazo e criterio de descarte, e nao entra como bolha nova.
+
+Criterio de descarte: se a conferencia nova exigir, para morder, que o leitor mude
+a cada deposito novo, entao o ganho era ilusorio e o ramo morre. Reverter a linha
+523 do Bolha.lean e os 4 objetos devolve o juiz ao estado de hoje.
+
+Linha de base, medida nesta maquina: 181 conferencias, 0 falhas, EXIT=0.
