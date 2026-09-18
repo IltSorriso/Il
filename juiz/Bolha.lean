@@ -528,9 +528,16 @@ def registroEspecies : List (String × List String) :=
   `none` se a espécie é desconhecida — e espécie desconhecida não tem forma
   canônica, o que é o mesmo que dizer que ela não existe para o juiz.
 
-  Este vocabulário é espelhado DE PROPÓSITO em `arreio.py` (a mão). São duas
-  implementações independentes, e a concordância delas não é pedida por
-  confiança: é conferida pelo ENDEREÇO — se o texto divergir, o hash diverge.
+  O VOCABULÁRIO mora AQUI, e SÓ AQUI. A mão (`arreio/Arreio.lean`) IMPORTA
+  esta tabela — não a copia. Enquanto houve um espelho em `arreio.py`, ele
+  divergiu em SILÊNCIO: conhecia 4 espécies contra 11, e a licença sem o campo
+  `sigilo` produzia o endereço `05ea7552…`, que nunca existiu no depósito.
+
+  A defesa que este comentário prometia — "a concordância é conferida pelo
+  ENDEREÇO" — NÃO funcionou, e vale registrar por quê: o endereço só pega
+  divergência naquilo que as DUAS mãos escrevem. `criar_bolha_licenca` era
+  chamada só no caminho-demo, nunca dos dois lados. Duas cópias não se
+  conferem por existirem; conferem-se por serem exercitadas juntas.
 -/
 def camposDe (s : String) : Option (List String) :=
   List.lookup s registroEspecies

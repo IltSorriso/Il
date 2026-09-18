@@ -20,16 +20,29 @@ on:
 
 jobs:
   juiz:
-    # A cadeia é DEFINIDA em ferramentas/reproduzir-cadeia.sh — o mesmo programa
-    # que a máquina própria roda. O fluxo não repete os passos: ele chama.
+    # A cadeia é DEFINIDA em cadeia/Cadeia.lean — o mesmo programa que a máquina
+    # própria roda. O fluxo não repete os passos: ele chama.
+    #
+    # O BOOTSTRAP é um passo SEPARADO e continua em shell, de propósito: uma
+    # cadeia escrita em Lean NÃO PODE SE INSTALAR — ela precisa do Lean para
+    # existir. Antes isso vivia dentro do próprio `reproduzir-cadeia.sh`;
+    # separado, o que sobra em shell é só o que instala o interpretador.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: A cadeia do juiz (definida em ferramentas/)
+      - name: O bootstrap (o único shell que sobra: instala o Lean)
+        run: |
+          if ! command -v lean >/dev/null 2>&1; then
+            curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
+            echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          fi
+          lean --version
+
+      - name: A cadeia do juiz (definida em cadeia/Cadeia.lean)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash ferramentas/reproduzir-cadeia.sh --etapa juiz --publicar
+        run: lean --run cadeia/Cadeia.lean --etapa juiz --publicar
       - name: A conta por dentro (a decomposição do número)
         # O NÚMERO SOZINHO É CAIXA PRETA. 104 conferências não dizem de onde
         # vieram, e número que ninguém consegue decompor não é auditável. A
@@ -71,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: A higiene da prosa (definida em ferramentas/)
+      - name: A higiene da prosa (definida em cadeia/Cadeia.lean)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash ferramentas/reproduzir-cadeia.sh --etapa prosa --publicar
+        run: lean --run cadeia/Cadeia.lean --etapa prosa --publicar
