@@ -170,6 +170,30 @@ def fluxoPublicar (raiz maquina emCi : String) (ok : Bool)
           publicar maquina emCi s!"cadeia - ERRO em {passo}" cauda "failure"
       | none => pure ()
 
+/-- O RECIBO LOCAL — o que o estado do GitHub carregava, mas morando AQUI.
+    O projeto NÃO usa Actions: a prova é local, e o portão é o `pre-push`.
+    Diz com que máquina, que ramo e que compromisso o número foi medido — sem
+    isso, um número sozinho não diz de onde veio. -/
+def recibo (raiz maquina etapa : String) (ok : Bool)
+    (juiz prosa : Option String) : IO Unit := do
+  let quando ← lerCmd "date -u +%Y-%m-%dT%H:%M:%SZ"
+  let head ← lerCmd "git rev-parse --short HEAD 2>/dev/null || echo desconhecido"
+  let ramo ← lerCmd "git rev-parse --abbrev-ref HEAD 2>/dev/null || echo desconhecido"
+  let linhas :=
+    [ s!"recibo:       {if ok then "PASSOU" else "FALHOU"}",
+      s!"etapa:        {etapa}",
+      s!"maquina:      {maquina}",
+      s!"ramo:         {ramo}",
+      s!"compromisso:  {head}",
+      s!"quando (UTC): {quando}" ]
+    ++ (match juiz with | some n => [s!"juiz:         {n}"] | none => [])
+    ++ (match prosa with | some n => [s!"prosa:        {n}"] | none => [])
+  IO.FS.writeFile (raiz ++ "/recibo-" ++ etapa ++ ".txt")
+    (String.intercalate "\n" linhas ++ "\n")
+  IO.println ""
+  IO.println s!"=== RECIBO (gravado em recibo-{etapa}.txt) ==="
+  for l in linhas do IO.println s!"  {l}"
+
 def main (args : List String) : IO Unit := do
   -- A RAIZ, ABSOLUTA. Um passo faz `cd juiz`, e `.` deixaria de apontar para a
   -- raiz do repositório — foi assim que quatro provas foram parar em `juiz/`.
@@ -202,6 +226,9 @@ def main (args : List String) : IO Unit := do
   match prosa with
   | some l => IO.println s!"  prosa: {l}"
   | none => pure ()
+  recibo raiz maquina etapa ok juiz prosa
+  -- O GitHub é OPCIONAL. O projeto não usa Actions: este caminho só é tentado
+  -- se `--publicar` for pedido E houver token. Sem ele, nada quebra.
   if args.contains "--publicar" then
     fluxoPublicar raiz maquina (if (← IO.getEnv "GITHUB_ACTIONS").isSome then "1" else "0")
       ok juiz prosa

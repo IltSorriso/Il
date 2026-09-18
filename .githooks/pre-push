@@ -1,0 +1,17 @@
+#!/bin/sh
+# O PORTÃO — local, sem Actions.
+#
+# O projeto NÃO usa GitHub Actions. A prova mora aqui, e o momento de cobrá-la
+# é este: o empurrão. A cadeia é a MESMA que roda em qualquer máquina — o CI
+# nunca foi a fonte, era só um atalho de velocidade.
+#
+# Para pular (você sabe o que está fazendo):  git push --no-verify
+echo "portão: rodando a cadeia antes de empurrar (2 a 3 min)..."
+if ! lean --run cadeia/Cadeia.lean --etapa tudo; then
+  echo
+  echo "  PORTÃO FECHADO — a cadeia falhou. Nada foi empurrado."
+  echo "  O recibo diz qual passo quebrou: recibo-tudo.txt"
+  echo "  Para pular conscientemente: git push --no-verify"
+  exit 1
+fi
+echo "  PORTÃO ABERTO — pode empurrar."

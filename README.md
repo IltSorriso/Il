@@ -14,6 +14,26 @@ Most formats treat license as metadata — a tag you may ignore. Bolha makes lic
 - **Content-addressed, always** — every reference is a sha256. A bolha is the deterministic manifesto of its parts; the render is a byproduct.
 - **Hand and judge** — the harness (`arreio/Arreio.lean`) writes the manifesto; the same **Lean 4** code base also holds the judge, which proves the *form*; a person confirms the *truth*.
 
+## The local cycle (there is no CI runner)
+
+The chain is **defined once**, in `cadeia/Cadeia.lean`, and run by whichever machine you have.
+GitHub Actions is not part of the design — it was one possible runner, never the source.
+
+    lean --run cadeia/Cadeia.lean --etapa tudo      # the whole chain: judge + prose
+    lean --run cadeia/Cadeia.lean --etapa juiz      # just the judge
+    lean --run cadeia/Cadeia.lean --etapa prosa     # just the prose
+
+Each run writes `recibo-<etapa>.txt`: the outcome, the machine, the branch, the commit and the
+UTC time. A bare number does not say where it came from; the receipt does. Receipts and proofs
+are **generated — never versioned**.
+
+The gate is `.githooks/pre-push`. Enable it once per clone:
+
+    git config core.hooksPath .githooks
+
+Compiling the whole harness takes about half a minute. `arreio/Correr.lean` exists for that:
+it imports the compiled `.olean` instead of rebuilding, and costs a fraction of the time.
+
 ## The form lives in the judge (see `juiz/`)
 
 The specification is executable, not prose:
@@ -29,7 +49,8 @@ The specification is executable, not prose:
 - `higiene/` — the prose judge, in Lean 4: every document declares its type and authority, cited paths
   must exist, and only the cover lives at the root.
 - `cadeia/` — the chain, defined once, run by any machine.
-- `.github/workflows/verificar.yml` — CI runs the chain (the music flow, the judge, the prose judge).
+- `.githooks/pre-push` — **the gate**. The chain runs before every push, on your machine, locally.
+  There is no GitHub Actions here: the proof lives where it is produced. `git push --no-verify` skips it.
 
 
 ## Status

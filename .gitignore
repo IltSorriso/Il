@@ -10,3 +10,4 @@ MAPA.md
 # versionagem do acervo em silencio. Neste repositorio elas sao so lixo de execucao,
 # e por isso a regra vive em .git/info/exclude (local, nao compartilhado).
 /prova-*.txt
+/recibo-*.txt
