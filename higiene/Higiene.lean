@@ -177,9 +177,15 @@ def verificar (raiz : String) (mostrarMapa : Bool) : IO UInt32 := do
                 for (termo, quando, oQue) in termosMortos do
                   if contemSub termo texto then
                     falhas := falhas ++ [s!"{rel}: usa termo morto '{termo}' (morreu em {quando}: {oQue})"]
-              for citado in ← caminhosCitados caminho do
-                if !(← System.FilePath.pathExists (raiz ++ "/" ++ citado)) then
-                  falhas := falhas ++ [s!"{rel}: aponta para `{citado}` — nao existe"]
+                -- A checagem de CAMINHO segue a mesma regra da de TERMO MORTO: só
+                -- vale para documento que AFIRMA O PRESENTE. Um diário datado citar
+                -- `arreio.py` numa passagem de 2026-09-15 é VERDADE daquela data —
+                -- cobrar dele o caminho de hoje seria falsificar o registro, que é
+                -- o mesmo defeito que renomear o diário. Contrato, capa e apontador
+                -- afirmam o presente, e é deles que se cobra.
+                for citado in ← caminhosCitados caminho do
+                  if !(← System.FilePath.pathExists (raiz ++ "/" ++ citado)) then
+                    falhas := falhas ++ [s!"{rel}: aponta para `{citado}` — nao existe"]
               linhasMapa := linhasMapa ++ [(rel, tipo, autoridade)]
   if mostrarMapa then
     IO.println "--- MAPA: onde a verdade mora (GERADO, nunca versionado) ---"
@@ -201,7 +207,11 @@ def main (args : List String) : IO Unit := do
   let raiz := if (args.find? (fun a => a == "--raiz")).isSome
               then (args.dropWhile (fun a => a != "--raiz")).drop 1 |>.head?.getD "."
               else "."
-  discard <| verificar raiz (args.contains "--mapa")
+  -- O CÓDIGO DE SAÍDA IMPORTA. `discard` o jogava fora: o higiene dizia
+  -- "3 falha(s)" e saía com 0 — falha reportada que não reprova o build é
+  -- pior que falha silenciosa, porque PARECE conferida.
+  let rc ← verificar raiz (args.contains "--mapa")
+  if rc != 0 then IO.Process.exit rc.toUInt8
 
 end Higiene
 
