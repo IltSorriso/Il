@@ -127,25 +127,19 @@ def linhaDeErro (arq : String) : IO String := do
         let tres := (uteis.take 3).reverse
         pure ((String.intercalate " " tres |>.take 130).toString)
 
-/-- Le' o `.env` da raiz: linhas `CHAVE=valor`, `#` comenta, e a ULTIMA
-    definicao de uma chave VENCE — e' assim que o atelie troca `IL_REMOTO` sem
-    tocar no bloco que veio do Il. Nao le' segredo nenhum: o arquivo declara
-    NOMES, e so'. -/
-def doEnv (raiz chave : String) : IO (Option String) := do
-  let p := raiz ++ "/.env"
-  if !(← System.FilePath.pathExists p) then return none
-  let texto ← IO.FS.readFile p
-  let mut achado : Option String := none
-  for linha in texto.splitOn "\n" do
-    let l := linha.trimAscii.toString
-    match l.toList with
-    | '#' :: _ => pure ()
-    | _ =>
-        let partes := l.splitOn "="
-        if partes.length >= 2 then
-          if (partes.headD "").trimAscii.toString == chave then
-            achado := some ((String.intercalate "=" (partes.drop 1)).trimAscii.toString)
-  return achado
+/-- O NOME DO REPOSITORIO, lido do PROPRIO git — nao de tabela, e nao de
+    arquivo. Quem sabe como o repositorio se chama e' o git; uma segunda
+    declaracao so' cria uma segunda coisa para divergir. -/
+def nomeDoRepo : IO String := do
+  let n ← lerCmd "git config --get remote.origin.url 2>/dev/null | awk -F/ '{print $NF}' | sed 's/[.]git$//'"
+  pure (if n.isEmpty then "?" else n)
+
+/-- O RAMO PRINCIPAL, tambem do git: `refs/remotes/origin/HEAD` e' o que o
+    PROPRIO git chama de ramo principal. Se o clone nao o tem, devolve `none`
+    — e entao o recibo NAO afirma qual e' o principal, em vez de inventar um. -/
+def ramoPrincipal : IO (Option String) := do
+  let r ← lerCmd "git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||'"
+  pure (if r.isEmpty then none else some r)
 
 /-- O RECIBO LOCAL — o que o estado do GitHub carregava, mas morando AQUI.
     O projeto NÃO usa Actions: a prova é local, e o portão é o `pre-push`.
@@ -156,17 +150,8 @@ def recibo (raiz maquina etapa : String) (ok : Bool)
   let quando ← lerCmd "date -u +%Y-%m-%dT%H:%M:%SZ"
   let head ← lerCmd "git rev-parse --short HEAD 2>/dev/null || echo desconhecido"
   let ramo ← lerCmd "git rev-parse --abbrev-ref HEAD 2>/dev/null || echo desconhecido"
-  -- CADA REPOSITORIO TEM O SEU. No atelie o ramo principal e' `atelie`, nao
-  -- `pindorama` — ler `IL_RAMO` nos dois acusaria o atelie de estar no ramo
-  -- errado em TODA corrida. O que e' do atelie vence; o do Il fica de padrao.
-  let nome ←
-    match ← doEnv raiz "ILTS_REPO" with
-    | some r => pure r
-    | none => pure ((← doEnv raiz "IL_REPO").getD "?")
-  let principal ←
-    match ← doEnv raiz "ILTS_RAMO" with
-    | some r => pure r
-    | none => pure ((← doEnv raiz "IL_RAMO").getD "?")
+  let nome ← nomeDoRepo
+  let principal ← ramoPrincipal
   let mut falha : List String := []
   if !ok then
     match ← primeiroQueFalhou raiz with
@@ -178,12 +163,14 @@ def recibo (raiz maquina etapa : String) (ok : Bool)
     [ s!"recibo:       {if ok then "PASSOU" else "FALHOU"}",
       s!"etapa:        {etapa}",
       s!"maquina:      {maquina}",
-      s!"repositorio:  {nome} · principal {principal}",
+      s!"repositorio:  {nome}",
       s!"ramo medido:  {ramo}",
       s!"compromisso:  {head}",
       s!"quando (UTC): {quando}" ]
-    ++ (if ramo == principal then [] else
-          [s!"ATENCAO:      o ramo medido NAO e' o principal declarado em .env"])
+    ++ (match principal with
+        | some p => if ramo == p then [] else
+            [s!"ATENCAO:      o ramo medido NAO e' o principal do repositorio ({p})"]
+        | none => [])
     ++ falha
     ++ (match juiz with | some n => [s!"juiz:         {n}"] | none => [])
     ++ (match prosa with | some n => [s!"prosa:        {n}"] | none => [])
@@ -209,16 +196,8 @@ def main (args : List String) : IO Unit := do
   IO.println s!"  etapa:    {etapa}"
   IO.println s!"  máquina:  {maquina}"
   IO.println s!"  núcleos:  {cores}"
-  let nomeRep ←
-    match ← doEnv raiz "ILTS_REPO" with
-    | some r => pure r
-    | none => pure ((← doEnv raiz "IL_REPO").getD "?")
-  let ramRep ←
-    match ← doEnv raiz "ILTS_RAMO" with
-    | some r => pure r
-    | none => pure ((← doEnv raiz "IL_RAMO").getD "?")
-  let caudaRep := if (← doEnv raiz "ILTS_REPO").isSome then " · atelie (puxa de il)" else ""
-  IO.println s!"  repositorio: {nomeRep} ({ramRep}){caudaRep}"
+  let nomeRep ← nomeDoRepo
+  IO.println s!"  repositorio: {nomeRep}"
   IO.println s!"  Lean fixado: {(← IO.FS.readFile (raiz ++ "/lean-toolchain")).trim}"
   IO.println ""
   let mut ok := true

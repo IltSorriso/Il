@@ -6,6 +6,22 @@
 # nunca foi a fonte, era só um atalho de velocidade.
 #
 # Para pular (você sabe o que está fazendo):  git push --no-verify
+
+# ── E HÁ UM PORTÃO ANTES DESTE, E ELE NÃO TEM ESCAPE ──────────────────────────
+# O ateliê PUXA do Il e NUNCA empurra para lá. Se um push saísse para o Il, ele
+# levaria o acervo PRIVADO para o repositório PÚBLICO — e isso não se desfaz:
+# endereço publicado é endereço na mão de outra pessoa.
+#
+# A condição é "o alvo é o Il E este repositório não é o Il". No próprio Il nada
+# dispara (lá o `origin` É o Il, e empurrar para si mesmo é o normal).
+if echo "$1$2" | grep -q "IltSorriso/Il"; then
+  if ! git config --get remote.origin.url 2>/dev/null | grep -q "IltSorriso/Il"; then
+    echo "  PORTÃO FECHADO — este push iria para o Il (público)."
+    echo "  O ateliê puxa do Il e NUNCA empurra para lá."
+    echo "  Para empurrar o ateliê:  git push origin atelie"
+    exit 1
+  fi
+fi
 echo "portão: rodando a cadeia antes de empurrar (2 a 3 min)..."
 if ! lean --run cadeia/Cadeia.lean --etapa tudo; then
   echo
