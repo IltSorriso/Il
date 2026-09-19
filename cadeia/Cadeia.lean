@@ -90,19 +90,22 @@ def numero (raiz sufixo : String) : IO (Option String) := do
           | none => none)
 
 
--- ── PUBLICAR O NÚMERO ───────────────────────────────────────────────────────
--- O número sozinho é caixa preta: "183 conferências" não diz de onde veio.
--- Publicá-lo como ESTADO DO COMPROMISSO o torna legível por qualquer um, sem
--- credencial. O rótulo leva o NOME DE QUEM PROVOU: no CI sai o rótulo canônico;
--- em qualquer outra máquina sai com o nome dela — assim se lê, sem credencial,
--- se a prova existe só no atalho ou também numa máquina sua.
-
 /-- A ORDEM DA CADEIA — e não a alfabética. "conformidade" vem antes de "ponte"
     no alfabeto, e por isso o canal publicava a CONSEQUÊNCIA (falta o
     Ponte.olean) em vez da CAUSA (o erro que quebrou o Bolha.lean). -/
 def ordemDaCadeia : List String :=
   ["versao-do-lean", "hash-sha256", "spec-bolha", "ponte",
    "mao-escreve-a-cancao", "conformidade", "higiene-da-prosa"]
+
+/-- Apaga TODA prova e TODO marco — não só os da etapa pedida. Antes, `--etapa
+    juiz` deixava de pé a `prova-higiene-da-prosa.txt` da corrida anterior, e o
+    recibo a apresentava como se tivesse sido medida agora. Pior: com `--etapa
+    nada` o recibo dizia "PASSOU, 183 conferências" sem ter rodado NADA.
+    Número não medido nesta corrida não é número. -/
+def limparTudo (raiz : String) : IO Unit := do
+  for r in ordemDaCadeia do
+    for f in [raiz ++ "/prova-" ++ r ++ ".txt", raiz ++ "/.falhou-" ++ r] do
+      if ← System.FilePath.pathExists f then IO.FS.removeFile f
 
 def primeiroQueFalhou (raiz : String) : IO (Option String) := do
   let mut achado : Option String := none
@@ -124,51 +127,25 @@ def linhaDeErro (arq : String) : IO String := do
         let tres := (uteis.take 3).reverse
         pure ((String.intercalate " " tres |>.take 130).toString)
 
-def achatado (s : String) : String :=
-  let a := (s.replace "\n" " ").replace "\r" " "
-  let b := a.replace "\\" "\\\\"
-  b.replace "\"" "\\\""
-
-def publicar (maquina emCi : String) (ctxBase desc estado : String) : IO Unit := do
-  let ctx := if emCi == "1" then ctxBase else s!"{ctxBase} [{maquina}]"
-  let abre := "{"
-  let fecha := "}"
-  let corpo := abre ++ "\"state\":\"" ++ estado ++ "\",\"context\":\"" ++ ctx
-                ++ "\",\"description\":\"" ++ achatado desc ++ "\"" ++ fecha
-  let repo := (← IO.getEnv "GITHUB_REPOSITORY").getD "IltSorriso/Il"
-  let sha := (← IO.getEnv "GITHUB_SHA").getD (← lerCmd "git rev-parse HEAD 2>/dev/null || echo desconhecido")
-  let token := (← IO.getEnv "GITHUB_TOKEN").getD ""
-  IO.FS.writeFile "corpo.json" corpo
-  let _ ← IO.Process.output
-    { cmd := "curl",
-      args := #["-sS", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
-                "-H", s!"Authorization: Bearer {token}",
-                "-H", "Accept: application/vnd.github+json",
-                s!"https://api.github.com/repos/{repo}/statuses/{sha}",
-                "--data", "@corpo.json"] }
-  IO.println s!"  publicado: {ctx}"
-
-def fluxoPublicar (raiz maquina emCi : String) (ok : Bool)
-    (numJuiz numProsa : Option String) : IO Unit := do
-  let token := (← IO.getEnv "GITHUB_TOKEN").getD ""
-  if token.isEmpty then
-    IO.println "  PUBLICAR pedido, mas sem GITHUB_TOKEN — nada publicado."
-  else
-    let estado := if ok then "success" else "failure"
-    let rj := (← IO.getEnv "PROVA_ROTULO_JUIZ").getD "juiz - numero"
-    let rp := (← IO.getEnv "PROVA_ROTULO_PROSA").getD "prosa - numero"
-    match numJuiz with
-    | some n => publicar maquina emCi rj n estado
-    | none => pure ()
-    match numProsa with
-    | some n => publicar maquina emCi rp n estado
-    | none => pure ()
-    if !ok then
-      match ← primeiroQueFalhou raiz with
-      | some passo =>
-          let cauda ← linhaDeErro (raiz ++ "/prova-" ++ passo ++ ".txt")
-          publicar maquina emCi s!"cadeia - ERRO em {passo}" cauda "failure"
-      | none => pure ()
+/-- Le' o `.env` da raiz: linhas `CHAVE=valor`, `#` comenta, e a ULTIMA
+    definicao de uma chave VENCE — e' assim que o atelie troca `IL_REMOTO` sem
+    tocar no bloco que veio do Il. Nao le' segredo nenhum: o arquivo declara
+    NOMES, e so'. -/
+def doEnv (raiz chave : String) : IO (Option String) := do
+  let p := raiz ++ "/.env"
+  if !(← System.FilePath.pathExists p) then return none
+  let texto ← IO.FS.readFile p
+  let mut achado : Option String := none
+  for linha in texto.splitOn "\n" do
+    let l := linha.trimAscii.toString
+    match l.toList with
+    | '#' :: _ => pure ()
+    | _ =>
+        let partes := l.splitOn "="
+        if partes.length >= 2 then
+          if (partes.headD "").trimAscii.toString == chave then
+            achado := some ((String.intercalate "=" (partes.drop 1)).trimAscii.toString)
+  return achado
 
 /-- O RECIBO LOCAL — o que o estado do GitHub carregava, mas morando AQUI.
     O projeto NÃO usa Actions: a prova é local, e o portão é o `pre-push`.
@@ -179,13 +156,26 @@ def recibo (raiz maquina etapa : String) (ok : Bool)
   let quando ← lerCmd "date -u +%Y-%m-%dT%H:%M:%SZ"
   let head ← lerCmd "git rev-parse --short HEAD 2>/dev/null || echo desconhecido"
   let ramo ← lerCmd "git rev-parse --abbrev-ref HEAD 2>/dev/null || echo desconhecido"
+  let nome := (← doEnv raiz "IL_REPO").getD "?"
+  let principal := (← doEnv raiz "IL_RAMO").getD "?"
+  let mut falha : List String := []
+  if !ok then
+    match ← primeiroQueFalhou raiz with
+    | some passo =>
+        let cauda ← linhaDeErro (raiz ++ "/prova-" ++ passo ++ ".txt")
+        falha := [s!"falhou em:   {passo}", s!"erro:        {cauda}"]
+    | none => pure ()
   let linhas :=
     [ s!"recibo:       {if ok then "PASSOU" else "FALHOU"}",
       s!"etapa:        {etapa}",
       s!"maquina:      {maquina}",
-      s!"ramo:         {ramo}",
+      s!"repositorio:  {nome} · principal {principal}",
+      s!"ramo medido:  {ramo}",
       s!"compromisso:  {head}",
       s!"quando (UTC): {quando}" ]
+    ++ (if ramo == principal then [] else
+          [s!"ATENCAO:      o ramo medido NAO e' o principal declarado em .env"])
+    ++ falha
     ++ (match juiz with | some n => [s!"juiz:         {n}"] | none => [])
     ++ (match prosa with | some n => [s!"prosa:        {n}"] | none => [])
   IO.FS.writeFile (raiz ++ "/recibo-" ++ etapa ++ ".txt")
@@ -199,6 +189,7 @@ def main (args : List String) : IO Unit := do
   -- raiz do repositório — foi assim que quatro provas foram parar em `juiz/`.
   let raizF ← IO.FS.realPath "."
   let raiz : String := raizF.toString
+  limparTudo raiz
   let etapa :=
     match args.dropWhile (fun a => a != "--etapa") with
     | _ :: v :: _ => v
@@ -209,6 +200,10 @@ def main (args : List String) : IO Unit := do
   IO.println s!"  etapa:    {etapa}"
   IO.println s!"  máquina:  {maquina}"
   IO.println s!"  núcleos:  {cores}"
+  let nomeRep := (← doEnv raiz "IL_REPO").getD "?"
+  let ramRep := (← doEnv raiz "IL_RAMO").getD "?"
+  let caudaRep := if (← doEnv raiz "ILTS_REPO").isSome then " · atelie (puxa de il)" else ""
+  IO.println s!"  repositorio: {nomeRep} ({ramRep}){caudaRep}"
   IO.println s!"  Lean fixado: {(← IO.FS.readFile (raiz ++ "/lean-toolchain")).trim}"
   IO.println ""
   let mut ok := true
@@ -227,11 +222,6 @@ def main (args : List String) : IO Unit := do
   | some l => IO.println s!"  prosa: {l}"
   | none => pure ()
   recibo raiz maquina etapa ok juiz prosa
-  -- O GitHub é OPCIONAL. O projeto não usa Actions: este caminho só é tentado
-  -- se `--publicar` for pedido E houver token. Sem ele, nada quebra.
-  if args.contains "--publicar" then
-    fluxoPublicar raiz maquina (if (← IO.getEnv "GITHUB_ACTIONS").isSome then "1" else "0")
-      ok juiz prosa
   if !ok then
     IO.println "  A CADEIA FALHOU — ver .falhou-<rotulo>"
     IO.Process.exit 1
