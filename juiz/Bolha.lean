@@ -626,9 +626,13 @@ theorem enderecoDeBolha_igual_de_campos (t1 t2 : String)
   falso negativo. A MÃO (arreio.py) normaliza o texto quando ele entra; o juiz
   RECUSA o que escapou. O juiz não normaliza: ele decide.
 
-  PROCEDENCIA: as faixas vem das tabelas oficiais do Unicode (UCD), buscadas por
-  `ferramentas/buscar-tabelas.mjs`. Aquele programa NAO e' chamado por nada — ele e'
-  o progenitor deste dado, e sem esta linha ninguem saberia disso.
+  PROCEDENCIA: as faixas foram CALCULADAS por `ferramentas/regra-canonicidade.mjs`, a
+  partir do campo NFC_QC (No/Maybe) do `DerivedNormalizationProps.txt` — depois que
+  `ferramentas/buscar-tabelas.mjs` baixou as tabelas do Unicode. A regra desta lista e'
+  a "REGRA ESTRITA" daquele programa. As tabelas do UCD NAO sao versionadas (dado de
+  terceiro, grande e datado) e NAO existem nesta maquina: a cadeia que produziu este
+  dado passa por dois programas que nenhum outro programa chama. Sem estas linhas,
+  ninguem saberia nem de onde o dado veio nem como refaze-lo.
 -/
 def faixasProibidas : List (Nat × Nat) :=
   [ (0x0300, 0x034E), (0x0350, 0x036F), (0x0374, 0x0374), (0x037E, 0x037E), (0x0387, 0x0387), (0x0483, 0x0487),
