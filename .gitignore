@@ -2,7 +2,8 @@
 *.olean
 __pycache__/
 
-# gerado por higiene.py — nunca versionado (senao vira sombra e conflita entre os repos)
+# gerado por higiene/Higiene.lean — nunca versionado (senao vira sombra e conflita
+# entre os repos). Regra 5 do higiene: o mapa e' GERADO, nunca escrito a mao.
 MAPA.md
 
 # gerado pela cadeia. ATENCAO: `deposito/` e `bolhas/` NAO entram aqui — no atelie

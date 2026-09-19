@@ -2,6 +2,8 @@
 
 # Il — Individuação Livre
 
+*Português: [`LEIAME.md`](LEIAME.md) · 中文: [`LEIAME.zh.md`](LEIAME.zh.md)*
+
 **Il** (*free individuation*) is a project to become oneself through **libre technology** — built so that no empire, platform or gatekeeper holds the keys to your culture, memory or tools.
 
 Its first fruit is **Bolha**, a deterministic file format that groups and references media (texts, images, videos, audio) while carrying the **use-license of each component**.
@@ -49,17 +51,21 @@ The specification is executable, not prose:
 - `higiene/` — the prose judge, in Lean 4: every document declares its type and authority, cited paths
   must exist, and only the cover lives at the root.
 - `cadeia/` — the chain, defined once, run by any machine.
+- `ferramentas/` — **legacy**, from the Python/JS cycle. No program in the chain calls
+  anything here. Part of it is superseded by `juiz/Bolha.lean`; part of it still holds
+  capabilities that were never ported, and for those the file is the only record.
 - `.githooks/pre-push` — **the gate**. The chain runs before every push, on your machine, locally.
   There is no GitHub Actions here: the proof lives where it is produced. `git push --no-verify` skips it.
 
 
 ## Status
 
-Early prototype. The judge is verified locally (exit 0) with Lean 4.33.1 and in CI.
+Early prototype. The judge is verified locally (`exit 0`) with Lean 4.34.0, pinned in
+`lean-toolchain`. There is no CI runner: the chain runs on whichever machine you have.
 
 ## The two repositories
 
-- **Il** (this one) — public trunk: the product. Code is developed here first.
+- **Il** (this one) — the public trunk (`pindorama`): the product. Code is developed here first.
 - **IltS** — private workshop (a fork): the diary, the plan, and personal content. It pulls from here and never pushes back.
 
 ## License
