@@ -14,13 +14,17 @@
 #
 # A condição é "o alvo é o Il E este repositório não é o Il". No próprio Il nada
 # dispara (lá o `origin` É o Il, e empurrar para si mesmo é o normal).
-if echo "$1$2" | grep -q "IltSorriso/Il"; then
-  if ! git config --get remote.origin.url 2>/dev/null | grep -q "IltSorriso/Il"; then
-    echo "  PORTÃO FECHADO — este push iria para o Il (público)."
-    echo "  O ateliê puxa do Il e NUNCA empurra para lá."
-    echo "  Para empurrar o ateliê:  git push origin atelie"
-    exit 1
-  fi
+# NOMES EXATOS, NÃO SUBSTRING. A primeira versão procurava "IltSorriso/Il" e
+# ACEITAVA "IltSorriso/IltS.git" — porque `Il` é PREFIXO de `IltS`, e um `grep`
+# de substring não distingue os dois. O guarda que existe para separar os dois
+# repositorios não os separava. Aqui se compara o NOME, que é igual a si mesmo.
+alvo=$(printf '%s' "$2" | awk -F/ '{print $NF}' | sed 's/[.]git$//')
+origem=$(git config --get remote.origin.url 2>/dev/null | awk -F/ '{print $NF}' | sed 's/[.]git$//')
+if [ "$1" = "il" ] || { [ "$alvo" = "Il" ] && [ "$origem" != "Il" ]; }; then
+  echo "  PORTÃO FECHADO — este push iria para o Il (público)."
+  echo "  O ateliê puxa do Il e NUNCA empurra para lá."
+  echo "  Para empurrar o ateliê:  git push origin atelie"
+  exit 1
 fi
 echo "portão: rodando a cadeia antes de empurrar (2 a 3 min)..."
 if ! lean --run cadeia/Cadeia.lean --etapa tudo; then
