@@ -156,8 +156,17 @@ def recibo (raiz maquina etapa : String) (ok : Bool)
   let quando ← lerCmd "date -u +%Y-%m-%dT%H:%M:%SZ"
   let head ← lerCmd "git rev-parse --short HEAD 2>/dev/null || echo desconhecido"
   let ramo ← lerCmd "git rev-parse --abbrev-ref HEAD 2>/dev/null || echo desconhecido"
-  let nome := (← doEnv raiz "IL_REPO").getD "?"
-  let principal := (← doEnv raiz "IL_RAMO").getD "?"
+  -- CADA REPOSITORIO TEM O SEU. No atelie o ramo principal e' `atelie`, nao
+  -- `pindorama` — ler `IL_RAMO` nos dois acusaria o atelie de estar no ramo
+  -- errado em TODA corrida. O que e' do atelie vence; o do Il fica de padrao.
+  let nome ←
+    match ← doEnv raiz "ILTS_REPO" with
+    | some r => pure r
+    | none => pure ((← doEnv raiz "IL_REPO").getD "?")
+  let principal ←
+    match ← doEnv raiz "ILTS_RAMO" with
+    | some r => pure r
+    | none => pure ((← doEnv raiz "IL_RAMO").getD "?")
   let mut falha : List String := []
   if !ok then
     match ← primeiroQueFalhou raiz with
@@ -200,8 +209,14 @@ def main (args : List String) : IO Unit := do
   IO.println s!"  etapa:    {etapa}"
   IO.println s!"  máquina:  {maquina}"
   IO.println s!"  núcleos:  {cores}"
-  let nomeRep := (← doEnv raiz "IL_REPO").getD "?"
-  let ramRep := (← doEnv raiz "IL_RAMO").getD "?"
+  let nomeRep ←
+    match ← doEnv raiz "ILTS_REPO" with
+    | some r => pure r
+    | none => pure ((← doEnv raiz "IL_REPO").getD "?")
+  let ramRep ←
+    match ← doEnv raiz "ILTS_RAMO" with
+    | some r => pure r
+    | none => pure ((← doEnv raiz "IL_RAMO").getD "?")
   let caudaRep := if (← doEnv raiz "ILTS_REPO").isSome then " · atelie (puxa de il)" else ""
   IO.println s!"  repositorio: {nomeRep} ({ramRep}){caudaRep}"
   IO.println s!"  Lean fixado: {(← IO.FS.readFile (raiz ++ "/lean-toolchain")).trim}"
