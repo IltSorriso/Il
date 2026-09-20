@@ -1,0 +1,5 @@
+Sub-janela do agente do CLI: criacao de interfaces.
+
+O CLI e a interface devem beber da mesma fonte. Por isso o CLI ja' e' a API:
+cada comando devolve o mesmo dado que a tela vai desenhar. Se a interface
+tiver de refazer a conta, entao o CLI devolveu pouco.

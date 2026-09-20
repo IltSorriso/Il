@@ -1,0 +1,67 @@
+#!/bin/sh
+# il — a linha de comando do projeto Il.
+#
+# QUATRO CAMADAS. A regra e' uma so': uma camada so' chama a de baixo, e
+# nenhuma camada escreve no deposito sem passar pela de verificar.
+#
+#   1 estado     le' tudo, nao escreve nada — e' GERADO, nunca guardado
+#   2 verificar  roda o juiz e a prosa
+#   3 criar      escreve objetos no deposito
+#   4 manter     prazos, ramos, janelas
+#
+# As camadas NAO estao escritas aqui: sao BOLHAS de especie `proposito` no
+# proprio deposito, e este programa as LE'. Trocar uma camada e' gravar uma
+# bolha, nao editar este arquivo.
+set -u
+IL_RAIZ=${IL_RAIZ:-$(cd "$(dirname "$0")/.." && pwd)}
+DEP=${IL_DEPOSITO:-$IL_RAIZ/exemplos/deposito/objetos}
+QUEB=${IL_QUEBRADOS:-$IL_RAIZ/exemplos/quebrados/objetos}
+
+# o INDICE DE NOMES: nome|especie|endereco. UMA passada, UM processo.
+# GERADO a cada chamada: nao ha arquivo de indice para apodrecer.
+indice() {
+  # O NOME e' o campo `nome` quando a especie o tem. `anotacao`, `declaracao`,
+  # `musica` e `parte` NAO o tem — e o projeto nao declarou, ate agora, QUAL
+  # campo carrega o nome de cada especie. Ate declarar, esta e' a reserva, e
+  # ela e' VISIVEL: e' uma convencao do CLI, nao uma lei do juiz.
+  awk 'FNR==1 { if (NR>1 && tipo!="") printf "%s|%s|%s\n", (nome==""?"-":nome), tipo, arq
+                arq=FILENAME; sub(".*/","",arq); tipo=""; nome="" }
+       /^tipo: /   { if (tipo=="") tipo=substr($0,7) }
+       /^nome: /   { if (nome=="") nome=substr($0,7) }
+       /^titulo: / { if (nome=="") nome=substr($0,7) }
+       /^ramo: /   { if (nome=="") nome=substr($0,7) }
+       /^numero: / { if (nome=="") nome=substr($0,7) }
+       END         { if (tipo!="") printf "%s|%s|%s\n", (nome==""?"-":nome), tipo, arq }' \
+    "$DEP"/* "$QUEB"/* 2>/dev/null | sort
+}
+linhas() { printf '%s\n' "$IDX" | awk -F'|' -v f="$1" 'f==""||$2==f {printf "  %-28s %-11s %s\n",$1,$2,substr($3,1,12)}'; }
+
+case "${1:-ajuda}" in
+  estado)
+    IDX=$(indice)
+    echo "estado do sistema — GERADO em $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo
+    echo "  deposito   canon $(ls "$DEP" | wc -l | tr -d ' ') · quebrados $(ls "$QUEB" 2>/dev/null | wc -l | tr -d ' ')"
+    echo "  especies   $(printf '%s\n' "$IDX" | cut -d'|' -f2 | sort -u | tr '\n' ' ')"
+    echo "  janelas    $(printf '%s\n' "$IDX" | awk -F'|' '$2=="agente"' | wc -l | tr -d ' ') de agente · $(printf '%s\n' "$IDX" | awk -F'|' '$2=="proposito"' | wc -l | tr -d ' ') de proposito"
+    echo
+    case "${2:-}" in
+      --nomes)   linhas "" ;;
+      --janelas) echo "AS JANELAS — o endereco de cada uma, para os agentes usarem"; echo; linhas "agente"; echo; linhas "proposito" ;;
+      *)         linhas "" ;;
+    esac ;;
+  nome)     IDX=$(indice); printf '%s\n' "$IDX" | grep "^$2|" || echo "nao existe janela com o nome '$2'" ;;
+  verificar) echo "camada 2 — verificar"; echo "  porta: nada sobe sem esta camada verde"; echo "  corrida inteira:  lean --run cadeia/Cadeia.lean --etapa tudo" ;;
+  criar)     echo "camada 3 — criar: janelas · musica · bolha (toda criacao passa pela camada 2 depois)" ;;
+  manter)    echo "camada 4 — manter: prazos · ramos · janelas" ;;
+  *)
+    echo "il — as quatro camadas"
+    echo
+    echo "  il estado [--nomes|--janelas]   camada 1: le' tudo, nao escreve nada"
+    echo "  il verificar                    camada 2: o portao de entrada"
+    echo "  il criar <o que>                camada 3: a mao que escreve"
+    echo "  il manter <o que>               camada 4: o que vence e apodrece"
+    echo "  il nome <nome>                  o endereco da janela com esse nome"
+    echo
+    echo "  as camadas vem de bolhas de especie proposito no deposito" ;;
+esac

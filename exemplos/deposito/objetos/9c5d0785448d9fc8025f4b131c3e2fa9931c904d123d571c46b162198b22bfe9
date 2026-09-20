@@ -1,0 +1,7 @@
+Sub-janela do agente do CLI: manutencao das janelas de agente.
+
+Mantem os agentes usando as METRICAS do proprio CLI. Um agente sem metrica e'
+promessa, nao norma: ele so' vale o que um conferidor alcanca.
+
+Caso de uso: um agente e' julgado pelo que o CLI mede dele — quantas janelas
+ele nomeia, quais prazos ele carrega, o que ele deixou apodrecer.

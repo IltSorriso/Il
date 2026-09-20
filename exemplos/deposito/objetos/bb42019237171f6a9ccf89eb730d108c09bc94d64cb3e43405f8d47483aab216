@@ -1,0 +1,9 @@
+CAMADA 4 — MANTER. Prazos, ramos e janelas.
+
+Especificacao: o que vence, o que apodreceu, o que ficou sem alcance. Aqui mora
+o fiscal de prazos e a manutencao das janelas de agente.
+
+Casos de uso:
+  1. descobrir que uma declaracao vence em nove dias;
+  2. substituir uma janela escrita a mao por saida gerada;
+  3. apagar o que ninguem alcanca.

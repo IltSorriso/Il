@@ -1,0 +1,11 @@
+Agente do CLI. Cria e usa a linha de comando.
+
+As camadas sao quatro, e a regra entre elas e' uma so': uma camada so' chama a
+de baixo, e nenhuma camada escreve no deposito sem passar pela de verificar.
+
+  estado    le' tudo, nao escreve nada
+  verificar roda o juiz e a prosa
+  criar     escreve objetos no deposito
+  manter    prazos, ramos, janelas
+
+Caso de uso: o agente abre a sessao, pede o estado, e so' entao age.

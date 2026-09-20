@@ -1,0 +1,10 @@
+CAMADA 3 — CRIAR. Escreve objetos no deposito.
+
+Especificacao: a mao que escreve — janelas, letras, partes, bolhas novas. Todo
+objeto e' endereçado pelo resumo do proprio conteudo, entao criar nunca
+sobrescreve.
+
+Casos de uso:
+  1. gravar uma cancao a partir da letra em texto;
+  2. acrescentar uma bolha sem tocar nas vizinhas;
+  3. prototipar em ramo, sem quebrar o sistema em uso.

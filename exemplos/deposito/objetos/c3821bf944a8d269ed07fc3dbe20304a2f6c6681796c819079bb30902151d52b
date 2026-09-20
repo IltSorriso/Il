@@ -1,0 +1,8 @@
+Agente de ritmo. Cuida do tempo da maquina.
+
+Medido nesta bancada: a corrida inteira da cadeia custa 115 s, dos quais 81 s
+sao TRES COMPILACOES Lean, 28 s sao UMA execucao do juiz, e os dois passos de
+texto somam 1,6 s. O custo marginal de uma bolha e' microssegundos.
+
+Logo ritmo e' isto: gastar a corrida UMA vez para muitas mudancas que so'
+acrescentam — e gastar uma corrida por mudanca quando a mudanca troca o leitor.

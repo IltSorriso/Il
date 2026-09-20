@@ -1,0 +1,10 @@
+CAMADA 1 — ESTADO. Le' tudo, nao escreve nada.
+
+Especificacao: um comando que agrega o estado do sistema e GERA o indice de
+nomes das janelas. Nada e' guardado; por isso nada apodrece. O itinerario deixa
+de ser escrito a mao e passa a ser saida.
+
+Casos de uso:
+  1. o agente abre a sessao e sabe onde esta', sem remontar o estado a mao;
+  2. uma interface pede o mesmo dado em formato de tela;
+  3. um conferidor externo compara duas leituras e ve' o que mudou.

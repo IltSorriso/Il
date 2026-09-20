@@ -1,0 +1,9 @@
+CAMADA 2 — VERIFICAR. Roda o juiz e a prosa.
+
+Especificacao: a corrida da cadeia, com recibo datado, e o higiene da prosa.
+Portao de entrada: nada sobe sem esta camada verde.
+
+Casos de uso:
+  1. antes de empurrar para a origem;
+  2. depois de cada mudanca que troca o leitor;
+  3. para saber QUAL passo falhou, sem ler log inteiro.
