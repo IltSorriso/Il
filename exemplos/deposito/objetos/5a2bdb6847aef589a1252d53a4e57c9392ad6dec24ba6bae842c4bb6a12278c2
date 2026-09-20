@@ -1,0 +1,73 @@
+A lista: as cinco posições candidatas, medidas, e O QUE DECIDE cada uma.
+
+A ordem é PROVISÓRIA. A prioridade definitiva é decisão do criador; o que esta lista
+faz é registrar o que foi MEDIDO, para que a decisão não recomece do zero. Cada
+posição traz o caso de uso âncora que a justifica — e, onde não houver, ela própria o
+diz.
+
+1. O FISCAL VÊ A BOLHA
+   Natureza: CONSERTO, não porte. Estado medido: cego hoje, com prazo correndo.
+   O que é: fiscal-de-prazos lê a declaração por dois canais, mas o único caminho que
+   ele tem para o CANAL 1 é a mensagem do compromisso — e o endereço da bolha vive
+   SÓ no compromisso que a CRIOU. Qualquer compromisso posterior apaga a declaração
+   da vista dele. Medido: dos 2 ramos do remoto, ele diz "SEM DECLARAÇÃO DE PRAZO"
+   para ambos, enquanto a A5 do spec/caminho-sigilo existe, com prazo 2026-09-29.
+   Caso de uso âncora: um prazo declarado numa bolha tem de ser encontrado PELA
+   MÁQUINA. Se o vigia não lê a bolha, o vigia não vigia.
+   O que decide: o prazo 2026-09-29 CORRE. Um alarme que não toca não é dívida
+   técnica — é um alarme que não toca.
+   Custo: pequeno. A leitura da bolha já existe; falta achar o endereço sem depender
+   da mensagem do compromisso. O mecanismo funciona quando usado como projetado:
+   este próprio ramo carrega "declaracao:" na mensagem, e por isso ele é achável.
+
+2. O JUIZ LÊ OS CAMINHOS DAS BOLHAS
+   Natureza: CONSERTO. Estado: literal em Conformidade.lean.
+   O que é: as 3 bolhas de espécie `caminho` (exemplos, deposito, quebrados) declaram
+   ONDE cada acervo mora, e o juiz REPETE esses caminhos como literais em vez de
+   lê-los. A lei do sigilo morde, mas por CÓPIA — não por leitura.
+   Caso de uso âncora: mover um acervo de lugar deveria ser mudar UMA bolha, e não
+   caçar literais dentro do Lean.
+   Custo: pequeno.
+
+3. A RÉGUA DOS VASOS
+   Natureza: PORTE DE REGRA. Estado: APODRECIDO — não roda.
+   O que é: medir-vasos calcula a forma canônica pela REGRA ESTRITA (A″), conferindo
+   contra as tabelas do UCD. Os três diretórios que ele mede estão fixos em
+   ~/projetos/il-final/, que não existe nesta máquina; e ele morre em ENOENT na
+   PRIMEIRA leitura, sem try/catch.
+   Caso de uso âncora: hoje o juiz usa faixasProibidas e NINGUÉM confere se ela está
+   certa. A régua é o segundo caminho.
+   O que decide: é REGRA escrita em JavaScript — e regra mora no Lean. O porto leva a
+   REGRA; a PORTA (buscar o UCD) fica onde está, porque porta não é regra.
+   Custo: médio.
+
+4. O NOME PELA IDENTIDADE INTEIRA
+   Natureza: CONSERTO. Estado: matéria de classe, não bug.
+   O que é: o nome da vista é derivado de um CAMPO (conteudo, no caso da anotação), e
+   não da identidade. Dois objetos distintos podem reivindicar o mesmo nome, e um
+   sobrescreve o outro em silêncio — medido: 00de629d (CC0) e 3ac5e94f (reservado) são
+   a MESMA anotação com licença diferente, e a vista mostra só um dos dois.
+   Caso de uso âncora: a vista não pode esconder um objeto por colisão de nome.
+   O que decide: é o quarto caso do mesmo padrão — um nome que não distingue o que
+   precisa distinguir. O guarda do pre-push já passou por isso: "Il" é prefixo de
+   "IltS" e o guarda que existia para separá-los não os separava.
+   Custo: pequeno.
+
+5. bolhas/ VIRA ÍNDICE COMPUTADO
+   Natureza: REESTRUTURAÇÃO. Estado: cópia byte-exata.
+   O que é: as janelas do Il e do ateliê têm os MESMOS bytes também no depósito sob o
+   próprio sha256 — conferido, 18 de 18. A vista é projeção, e o ITINERARIO seção 7 já
+   a julgou "redundante: pode morrer".
+   Caso de uso âncora: uma pasta que repete o depósito pode divergir do depósito.
+   O que decide: se a vista é computável a qualquer momento a partir do depósito,
+   guardá-la é guardar uma segunda fonte. E o ramo spec/vista-projecao (8c21e37) já
+   PROVOU que ela volta idêntica quando rasgada — a prova de que ela pode ser
+   computada em vez de guardada.
+   Custo: médio.
+
+O QUE NÃO ESTÁ NESTA LISTA, E POR QUÊ
+   Os quatro do laboratório (buscar-tabelas, regra-canonicidade, prototipo-texto,
+   prototipo-A1A2) não entram como PORTE. O A2 é o único em aberto, e por motivo
+   próprio: a independência É o valor, e um verificador escrito pelo mesmo autor na
+   mesma linguagem não é independente. Ele fica como DÍVIDA DECLARADA — o que é
+   diferente de esquecimento.
