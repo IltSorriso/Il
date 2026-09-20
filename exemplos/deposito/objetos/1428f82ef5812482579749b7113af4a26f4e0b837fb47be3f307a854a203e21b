@@ -1,0 +1,100 @@
+A pergunta: o que ainda não é nem Lean nem bolha — e cada coisa que falta, é
+CAPACIDADE DO SISTEMA ou LABORATÓRIO DE PESQUISA?
+
+O levantamento foi medido, não lembrado: procurar por chamador em cadeia/, arreio/,
+higiene/, juiz/ e .githooks/ devolve ZERO para os seis programas de ferramentas/.
+Todos os seis estão versionados e nenhum tem quem os chame.
+
+E os seis NÃO são a mesma coisa. São duas naturezas, e essa é a distinção que esta
+declaração existe para fixar.
+
+1. CAPACIDADE DO SISTEMA — o sistema deveria ter, e não tem
+   São duas, e o estado de cada uma foi MEDIDO hoje, rodando-as:
+
+   fiscal-de-prazos.mjs (108 l.) — RODA. Cobra a A5: ramo fora da pindorama sem
+   declaração de prazo, ou com prazo vencido. Não derruba nada: ramo vencido não é
+   defeito do produto, é dívida de processo, então ele PUBLICA ESTADO e sai com 0
+   (A6). Lê a declaração por DOIS canais, e o número diz qual falou:
+     canal 1 — o compromisso carrega "declaracao: <sha256>", e o prazo é um CAMPO
+               lido do objeto, não um palpite sobre prosa;
+     canal 2 — a prosa de transição, "Prazo (A5): AAAA-MM-DD", lida por expressão
+               regular, enquanto houver ramo declarado do jeito velho.
+   Ele também mede a dívida do diário (a última entrada "## AAAA-MM-DD" contra a
+   data do último compromisso), e diz em voz alta quando o diário não existe no
+   repositório — como na pindorama, onde o diário é do ateliê.
+   Medição de hoje, rodado contra a API pública: "ramos fora da pindorama: 2 —
+   SEM DECLARAÇÃO DE PRAZO: spec/caminho-sigilo | spec/vista-projecao".
+   O DEFEITO QUE A MEDIÇÃO REVELOU: ele lê a mensagem do compromisso APENAS na ponta
+   do ramo. O endereço da declaração vive no compromisso que a CRIOU, e nenhum
+   compromisso posterior o repete — logo, no instante seguinte a qualquer compromisso
+   novo, a declaração sai da vista do fiscal. Os dois ramos do remoto estão hoje
+   nesse estado.
+   Caso de uso âncora: o A5 manda todo ramo declarar pergunta, prazo e critério de
+   descarte. Sem um cobrador, o prazo é enfeite — e há prova: a declaração do
+   spec/caminho-sigilo tem prazo 2026-09-29, e nenhum fiscal a está vendo.
+   Portável para Lean? SIM na parte de julgar — é comparação de data e leitura de
+   texto. O que NÃO é trivial é a parte que pergunta ao GitHub: a API some, e o
+   Arreio.lean sabe rodar processo externo mas não sabe falar HTTP.
+
+   medir-vasos.mjs (88 l.) — NÃO RODA. A RÉGUA ÚNICA sobre os vasos, pela definição
+   do SPEC: QUALIDADE DE USO (atrito), RECURSOS (bytes), TEMPO (microssegundos).
+   Ele responde, por espécie: peças, bytes, quantos nomes conferem com o próprio
+   sha256, quantos estão na forma canônica, e o custo por peça. Depois mede as
+   janelas humanas e o ATRITO — a intervenção humana necessária.
+   Medição de hoje, rodado: "Error: ENOENT ... /root/projetos/bancada/unicode/
+   UnicodeData.txt". Ele morre na PRIMEIRA leitura, sem try/catch. E não é só o
+   UCD: os três diretórios que ele mede estão fixos em ~/projetos/il-final/ e
+   ~/projetos/IltS/, e ~/projetos NÃO EXISTE nesta máquina.
+   Caso de uso âncora: "a vista é redundante?" só tem resposta MEDIDA se alguém
+   medir — e o veredito do ITINERARIO seção 7 ("redundante: pode morrer") é
+   exatamente isso. Sem a régua, cada discussão sobre custo recomeça do zero, e o
+   preço de uma bolha (medido uma vez, à mão) não se refaz.
+   Portável para Lean? SIM, e é o porto mais fácil dos seis: as três faces são
+   contagem de bytes, leitura de arquivo e cronômetro — e o Cadeia.lean já
+   cronometra com IO.monoNanosNow, e o Arreio.lean já varre diretório.
+
+2. LABORATÓRIO DE PESQUISA — existiu para DESCOBRIR a regra, e já cumpriu
+   São quatro. Deste laboratório, a REGRA foi portada (canonicidadeOk e o teorema,
+   em juiz/Bolha.lean) e o DADO foi portado (faixasProibidas, já com o comentário de
+   procedência apontando para o gerador certo).
+
+   buscar-tabelas.mjs (14 l.) — BAIXA três arquivos do UCD e não calcula nada. É a
+   porta pela qual a matéria-prima entra, e o único elo da cadeia inteira que
+   depende de rede. As tabelas NÃO são versionadas por decisão ("dado de terceiro,
+   grande e datado") e NÃO existem mais nesta máquina.
+   regra-canonicidade.mjs (159 l.) — QUEM DE FATO CALCULA as faixas: lê
+   DerivedNormalizationProps.txt, casa "NFC_QC ; [NM]", monta a lista e implementa a
+   REGRA ESTRITA. É o progenitor de faixasProibidas.
+   prototipo-texto.mjs (158 l.) — compara as REGRAS de forma canônica COM DADOS:
+   buracos (aceita o que não devia), atrito (recusa o que devia aceitar), tamanho de
+   tabela e custo de tempo.
+   prototipo-A1A2.mjs (161 l.) — o INSTRUMENTO: A1 é o juiz puro que RECUSA, e A2 é
+   o verificador INDEPENDENTE (ICU, via node) que confere a regra do juiz sobre todo
+   o repertório Unicode.
+   Caso de uso âncora do instrumento A2: o juiz RECUSA, e a recusa é uma REGRA — e
+   uma regra não confere a si mesma. Sem segunda opinião, a regra do juiz é uma
+   escolha no escuro.
+   Porto? NÃO — e não por acaso. A independência É o valor: um verificador escrito na
+   mesma linguagem, pelo mesmo autor, não é independente. Este é o único caso em que
+   o Node faz parte do MÉRITO, e não só da implementação.
+
+3. OS .txt — nenhum deles é violação
+   prova-*.txt e recibo-*.txt são GERADOS, e o .gitignore os ignora. São o recibo da
+   corrida, não acervo.
+   exemplos/musica/letra.txt (642 B) é FONTE, não dado: é a superfície onde o humano
+   escreve, e o depósito é o RESULTADO da escrita. O projeto já decidiu que
+   arquivo_texto não vira espécie, porque isso "transforma o depósito numa pasta".
+
+O CRITÉRIO DE DESCARTE desta declaração tem duas partes, porque as naturezas são duas.
+   CAPACIDADE: se ela exigir, para rodar, que se instale Node ou ICU na máquina,
+   então o porto foi de fachada — capacidade do sistema tem de rodar no que a cadeia
+   já usa.
+   INSTRUMENTO A2: se a segunda opinião vier do mesmo autor e da mesma linguagem, ela
+   não é independente e não mede nada. Se isso não puder ser evitado, o instrumento
+   não entra — e a regra do juiz fica sem segunda opinião, o que passa a ser uma
+   DÍVIDA DECLARADA em vez de um esquecimento.
+
+A PRIORIDADE NÃO ESTÁ NESTA DECLARAÇÃO. O prazo abaixo é o teto do MOVIMENTO, não o
+de cada capacidade: a posição de cada uma no itinerário é decisão que vem depois. E a
+regra do A4 vale — construto sem dono sai, e por isso cada capacidade entra com o seu
+caso de uso âncora nomeado acima, ou não entra.
