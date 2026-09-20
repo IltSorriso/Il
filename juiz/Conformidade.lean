@@ -243,6 +243,46 @@ def main : IO UInt32 := do
   if textosConferidos == 0 then
     IO.println "  nenhum texto a conferir neste depósito (dito em voz alta)"
 
+  IO.println "--- A CATEGORIA POR AUSÊNCIA (objeto sem `tipo:`: conteúdo, fixture ou artefato?) ---"
+  -- Todo endereço que um objeto COM `tipo:` aponta, em QUALQUER campo.
+  let mut apontados : List String := []
+  for (_, bytes) in bom ++ instancia do
+    let t := textoDe bytes
+    match tipoDe t with
+    | none => pure ()
+    | some _ =>
+        for (_, v) in parseCampos t do
+          if v.length == 64 then apontados := v :: apontados
+  let mut semTipo := 0
+  let mut deConteudo := 0
+  -- (1) NO CÂNONE: órfão é DEFEITO — o cânone é o conjunto publicado e julgado.
+  for (h, bytes) in bom do
+    let t := textoDe bytes
+    match tipoDe t with
+    | some _ => pure ()
+    | none =>
+        semTipo := semTipo + 1
+        total := total + 1
+        if apontados.contains h then
+          deConteudo := deConteudo + 1
+          IO.println s!"  {h.take 12}… sem tipo, ALCANÇADO por uma bolha ({bytes.size} B) — é conteúdo"
+        else
+          IO.println s!"  {h.take 12}… SEM TIPO E SEM ALCANCE — artefato até prova em contrário ({bytes.size} B)"
+          falhas := falhas + 1
+  -- (2) NA INSTÂNCIA LOCAL: dito em voz alta, mas não derruba — é acervo de trabalho.
+  let mut semTipoLocal := 0
+  let mut orfaoLocal := 0
+  for (h, bytes) in instancia do
+    let t := textoDe bytes
+    match tipoDe t with
+    | some _ => pure ()
+    | none =>
+        semTipoLocal := semTipoLocal + 1
+        if !apontados.contains h then orfaoLocal := orfaoLocal + 1
+  IO.println s!"  cánone: {semTipo} sem tipo · {deConteudo} de conteúdo · {semTipo - deConteudo} órfão(s)"
+  if semTipoLocal > 0 then
+    IO.println s!"  instância local: {semTipoLocal} sem tipo, {orfaoLocal} órfão(s) — dito em voz alta, não derruba"
+
   IO.println "--- CANÔNICO? (teste negativo: acento decomposto) ---"
   total := total + 1
   let decomposto := "cano\u0302nico"
