@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""nomes — nomes PROVISORIOS, com alerta e prioridade visual.
+
+POR QUE EXISTEM. Muitas especies nao tem campo de nome: `anotacao` tem
+`conteudo`, `declaracao` tem `ramo`, `parte` tem `numero`. Seus objetos sao
+alcancaveis so' pelo endereco. O nome provisorio e' um APELIDO gerado a partir
+do CONTEUDO — um ponteiro legivel, nunca autoridade.
+
+O NIVEL VEM DE FATOS, NAO DO MODELO. Quem diz a prioridade sao contas: prazo
+vencendo, objeto reprovado, ausencia de nome proprio. O modelo so' da' o apelido.
+Um modelo que responde sobre si mesmo ja' confabulou nesta bancada.
+
+O CACHE E' ENDERECADO POR CONTEUDO: a chave e' o endereco do objeto. Se o
+conteudo muda, o endereco muda, e o apelido velho simplesmente nao e' achado.
+Nao ha apelido para apodrecer.
+"""
+import datetime, json, os, subprocess, sys
+raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEP = os.path.join(raiz, "exemplos", "deposito", "objetos")
+QUEB = os.path.join(raiz, "exemplos", "quebrados", "objetos")
+CACHE = os.path.join(raiz, ".nomes-temporarios")
+
+def campos(p):
+    d = {}
+    try:
+        for l in open(p, encoding="utf-8"):
+            if ": " in l[:200]:
+                k, v = l.split(": ", 1)
+                d.setdefault(k.strip(), v.strip())
+    except Exception: pass
+    return d
+
+def objetos():
+    for pasta, prov in ((DEP, "canon"), (QUEB, "quebrado")):
+        if not os.path.isdir(pasta): continue
+        for h in sorted(os.listdir(pasta)):
+            f = os.path.join(pasta, h)
+            if os.path.isfile(f): yield h, f, prov
+
+def texto_de(h, f, c, visto=0):
+    # o texto do objeto: o que ele aponta, ou ele mesmo
+    for campo in ("conteudo", "texto", "letra"):
+        alvo = c.get(campo, "")
+        if len(alvo) == 64:
+            g = os.path.join(DEP, alvo)
+            if os.path.isfile(g) and visto < 3:
+                return texto_de(alvo, g, campos(g), visto + 1)
+    if "tipo" not in c:
+        return open(f, encoding="utf-8").read()
+    return " ".join(c.values())
+
+def cache(ler=True, gravar=None):
+    d = {}
+    if ler and os.path.isfile(CACHE):
+        for l in open(CACHE, encoding="utf-8"):
+            p = l.rstrip("\n").split("\t")
+            if len(p) >= 2: d[p[0]] = p[1]
+    if gravar is not None:
+        with open(CACHE, "w", encoding="utf-8") as fh:
+            for k in sorted(gravar): fh.write("%s\t%s\n" % (k, gravar[k]))
+    return d
+
+def nivel(c, prov, h):
+    hoje = datetime.date.today()
+    p = c.get("prazo")
+    if p:
+        try:
+            d = (datetime.date.fromisoformat(p) - hoje).days
+            if d < 0:  return 3, "PRAZO VENCIDO ha' %d dia(s)" % -d
+            if d <= 7: return 3, "vence em %d dia(s)" % d
+            if d <= 30: return 2, "vence em %d dias" % d
+        except ValueError: return 3, "prazo MALFORMADO: %s" % p
+    if prov == "quebrado": return 2, "caso de teste negativo"
+    if "nome" not in c:    return 2, "SEM NOME PROPRIO — apelido provisorio"
+    return 1, "nomeado"
+
+def apelido(h, f, c, memo, usar_modelo):
+    if "nome" in c: return c["nome"], False
+    if h in memo:   return memo[h], True
+    if not usar_modelo: return "-", False
+    t = texto_de(h, f, c)[:600].replace("\n", " ")
+    try:
+        r = subprocess.run([os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelo"),
+             "Responda APENAS com duas a quatro palavras, sem pontuacao, em portugues, "
+             "nomeando este conteudo: " + t], capture_output=True, text=True, timeout=70)
+        n = r.stdout.strip().splitlines()[-1].strip() if r.stdout.strip() else "-"
+    except Exception: n = "-"
+    if n: memo[h] = n
+    return n, True
+
+def main():
+    usar_modelo = "--gerar" in sys.argv
+    memo = cache(); novos = dict(memo); saida = []
+    for h, f, prov in objetos():
+        c = campos(f)
+        if not c: continue
+        esp = c.get("tipo", "-")
+        if esp in ("campo", "especie", "caminho", "vocabulario", "licenca"): continue
+        n, gerado = apelido(h, f, c, novos, usar_modelo)
+        niv, porque = nivel(c, prov, h)
+        saida.append((niv, n, esp, h, porque))
+    if usar_modelo: cache(False, novos)
+    saida.sort(key=lambda x: (-x[0], x[2], x[1]))
+    marca = {3: "[!!!]", 2: "[ ! ]", 1: "[   ]"}
+    print("NOMES — apelidos provisorios e alertas, por prioridade")
+    print("  nivel vem de FATOS; o apelido vem do modelo quando o objeto nao tem nome")
+    print()
+    for niv, n, esp, h, porque in saida:
+        print("  %s %-26s %-11s %s  %s" % (marca[niv], n[:26], esp, h[:12], porque))
+    c3 = sum(1 for s in saida if s[0] == 3)
+    print()
+    print("  %d objeto(s) · %d em ALTO · %d em MEDIO · %d com nome proprio" % (
+        len(saida), c3, sum(1 for s in saida if s[0] == 2), sum(1 for s in saida if s[0] == 1)))
+    return 1 if c3 else 0
+sys.exit(main())

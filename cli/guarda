@@ -1,0 +1,33 @@
+#!/bin/sh
+# guarda — recusa julgar quando o COMPILADO e' mais velho que a FONTE.
+#
+# POR QUE EXISTE. O compilado do juiz fica em `juiz/*.olean` e NAO e' versionado
+# (esta' no .gitignore). Se alguem mexer numa especie em `juiz/Bolha.lean` e
+# rodar o juiz sem recompilar, o juiz LE' O REGISTRO VELHO e acusa um erro que
+# nao existe. Aconteceu em 2026-09-20: `Bolha.lean` as 22:06, `Bolha.olean` as
+# 16:49 — e o juiz disse "agente: esta' no vocabulario e NAO esta' no registro
+# literal" quando o registro JA' estava certo.
+set -u
+IL_RAIZ=${IL_RAIZ:-$(cd "$(dirname "$0")/.." && pwd)}
+velho=0
+# SO' OS QUATRO QUE A CADEIA COMPILA PARA `.olean`. Os outros (`Conformidade`,
+# `Higiene`, `Correr`) sao EXECUTADOS com `lean --run` e nunca viram compilado —
+# cobrar compilado deles seria cobrar o que a cadeia nao faz.
+for fonte in "$IL_RAIZ"/juiz/Sha256.lean "$IL_RAIZ"/juiz/Bolha.lean \
+             "$IL_RAIZ"/juiz/Ponte.lean "$IL_RAIZ"/arreio/Arreio.lean; do
+  [ -f "$fonte" ] || continue
+  obj="${fonte%.lean}.olean"
+  if [ ! -f "$obj" ]; then
+    echo "  SEM COMPILADO: ${fonte##*/} — rode a camada de verificar"
+    velho=1
+  elif [ "$fonte" -nt "$obj" ]; then
+    echo "  COMPILADO VELHO: ${fonte##*/} (${fonte##*/} mais novo que ${obj##*/})"
+    velho=1
+  fi
+done
+if [ "$velho" = 1 ]; then
+  echo "guarda: o compilado nao corresponde a fonte — RECUSO julgar"
+  echo "        recompile: cd juiz && LEAN_PATH=. lean -o Bolha.olean Bolha.lean"
+  exit 1
+fi
+echo "guarda: compilado em dia com a fonte"

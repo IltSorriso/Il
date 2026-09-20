@@ -15,3 +15,9 @@ MAPA.md
 
 # marcador de falha da cadeia: nasce numa corrida e morre na seguinte
 .falhou-*
+
+# a chave do modelo generativo — so no atelie, e nunca versionada
+/.chaves/
+
+# apelidos provisorios: GERADOS, nunca versionados
+/.nomes-temporarios

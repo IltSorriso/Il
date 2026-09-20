@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""modelo — a chamada interna ao modelo generativo.
+
+A CHAVE NAO MORA AQUI, e nao mora no repositorio publico. Ela e' PROCURADA,
+nesta ordem:
+  1. a variavel IL_CHAVE_DEEPSEEK
+  2. $IL_RAIZ/.chaves/deepseek      (o atelie e' quem a tem)
+  3. ~/.chaves/deepseek
+Sem chave, o programa recusa com um recado claro em vez de tentar sem.
+
+Uso:  echo "pergunta" | cli/modelo      ou      cli/modelo pergunta
+"""
+import json, os, sys, urllib.request
+raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def chave():
+    k = os.environ.get("IL_CHAVE_DEEPSEEK")
+    if k: return k.strip()
+    for p in (os.path.join(raiz, ".chaves", "deepseek"),
+              os.path.expanduser("~/.chaves/deepseek")):
+        if os.path.isfile(p):
+            with open(p) as f: return f.read().strip()
+    return None
+
+k = chave()
+if not k:
+    sys.stderr.write("sem chave: ponha-a em $IL_RAIZ/.chaves/deepseek, ou em $IL_CHAVE_DEEPSEEK\n")
+    sys.exit(3)
+
+texto = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else sys.stdin.read()
+modelo = os.environ.get("IL_MODELO", "deepseek-chat")
+corpo = json.dumps({"model": modelo,
+                    "messages": [{"role": "user", "content": texto}],
+                    "temperature": 0, "max_tokens": 400}).encode()
+req = urllib.request.Request("https://api.deepseek.com/chat/completions", data=corpo,
+    headers={"Content-Type": "application/json", "Authorization": "Bearer " + k})
+try:
+    with urllib.request.urlopen(req, timeout=60) as r:
+        d = json.load(r)
+except Exception as e:
+    sys.stderr.write("a chamada falhou: %s\n" % e); sys.exit(4)
+u = d.get("usage", {})
+sys.stderr.write("[modelo: %s · %s unidades de texto]\n" % (d.get("model","?"), u.get("total_tokens","?")))
+print(d["choices"][0]["message"]["content"].strip())
