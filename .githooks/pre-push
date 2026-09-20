@@ -26,6 +26,12 @@ if [ "$1" = "il" ] || { [ "$alvo" = "Il" ] && [ "$origem" != "Il" ]; }; then
   echo "  Para empurrar o ateliê:  git push origin atelie"
   exit 1
 fi
+# O `lean` mora em ~/.elan/bin e NAO esta' no PATH com que o git chama este
+# portao. Sem esta linha o portao fechava por "lean: not found" — fechava
+# contra o PROPRIO projeto, nao contra o que ele existe para medir. Medido em
+# 2026-09-20: `sh -c 'lean --version'` devolvia "not found".
+PATH="$HOME/.elan/bin:$PATH"
+export PATH
 echo "portão: rodando a cadeia antes de empurrar (2 a 3 min)..."
 if ! lean --run cadeia/Cadeia.lean --etapa tudo; then
   echo
