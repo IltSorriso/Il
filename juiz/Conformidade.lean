@@ -243,18 +243,32 @@ def main : IO UInt32 := do
   if textosConferidos == 0 then
     IO.println "  nenhum texto a conferir neste depósito (dito em voz alta)"
 
-  IO.println "--- A CATEGORIA POR AUSÊNCIA (objeto sem `tipo:`: conteúdo, fixture ou artefato?) ---"
-  -- Todo endereço que um objeto COM `tipo:` aponta, em QUALQUER campo.
-  let mut apontados : List String := []
+  IO.println "--- A CATEGORIA POR AUSÊNCIA (objeto sem `tipo:`: conteúdo, insumo de teste ou artefato?) ---"
+  -- Onde cada endereço é apontado. TRÊS conjuntos, porque a PROCEDÊNCIA do
+  -- ponteiro muda o que o objeto é: apontado pelo cânone é conteúdo; apontado
+  -- só pelo conjunto que DEVE reprovar é insumo de teste negativo; apontado por
+  -- ninguém é artefato. Sem essa separação, uma fixture passa por conteúdo e um
+  -- artefato passa por fixture — foi exatamente o que aconteceu com o primeiro
+  -- desenho deste portão, que lia `bom ++ instancia` e esquecia `queb`.
+  let mut porCanon : List String := []
+  let mut porQueb : List String := []
   for (_, bytes) in bom ++ instancia do
     let t := textoDe bytes
     match tipoDe t with
     | none => pure ()
     | some _ =>
         for (_, v) in parseCampos t do
-          if v.length == 64 then apontados := v :: apontados
+          if v.length == 64 then porCanon := v :: porCanon
+  for (_, bytes) in queb do
+    let t := textoDe bytes
+    match tipoDe t with
+    | none => pure ()
+    | some _ =>
+        for (_, v) in parseCampos t do
+          if v.length == 64 then porQueb := v :: porQueb
   let mut semTipo := 0
   let mut deConteudo := 0
+  let mut deTeste := 0
   -- (1) NO CÂNONE: órfão é DEFEITO — o cânone é o conjunto publicado e julgado.
   for (h, bytes) in bom do
     let t := textoDe bytes
@@ -263,9 +277,12 @@ def main : IO UInt32 := do
     | none =>
         semTipo := semTipo + 1
         total := total + 1
-        if apontados.contains h then
+        if porCanon.contains h then
           deConteudo := deConteudo + 1
-          IO.println s!"  {h.take 12}… sem tipo, ALCANÇADO por uma bolha ({bytes.size} B) — é conteúdo"
+          IO.println s!"  {h.take 12}… sem tipo, ALCANÇADO pelo cânone ({bytes.size} B) — é conteúdo"
+        else if porQueb.contains h then
+          deTeste := deTeste + 1
+          IO.println s!"  {h.take 12}… sem tipo, alcançado SÓ por um quebrado ({bytes.size} B) — insumo de teste negativo"
         else
           IO.println s!"  {h.take 12}… SEM TIPO E SEM ALCANCE — artefato até prova em contrário ({bytes.size} B)"
           falhas := falhas + 1
@@ -278,8 +295,8 @@ def main : IO UInt32 := do
     | some _ => pure ()
     | none =>
         semTipoLocal := semTipoLocal + 1
-        if !apontados.contains h then orfaoLocal := orfaoLocal + 1
-  IO.println s!"  cánone: {semTipo} sem tipo · {deConteudo} de conteúdo · {semTipo - deConteudo} órfão(s)"
+        if !(porCanon.contains h) && !(porQueb.contains h) then orfaoLocal := orfaoLocal + 1
+  IO.println s!"  cánone: {semTipo} sem tipo · {deConteudo} de conteúdo · {deTeste} insumo(s) de teste · {semTipo - deConteudo - deTeste} órfão(s)"
   if semTipoLocal > 0 then
     IO.println s!"  instância local: {semTipoLocal} sem tipo, {orfaoLocal} órfão(s) — dito em voz alta, não derruba"
 
