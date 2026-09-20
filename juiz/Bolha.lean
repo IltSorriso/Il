@@ -515,6 +515,7 @@ def registroEspecies : List (String × List String) :=
     ("musica",   ["tipo", "titulo", "interprete", "letra", "partes", "licenca"]),
     ("parte",    ["tipo", "numero", "papel", "letra", "licenca"]),
     ("declaracao", ["tipo", "ramo", "prazo", "texto", "licenca"]),
+    ("agente",     ["tipo", "nome", "papel", "texto", "licenca"]),
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.
