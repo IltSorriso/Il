@@ -43,6 +43,11 @@ def passosJuiz : List Passo :=
     ⟨"hash-sha256", "cd juiz && lean -o Sha256.olean Sha256.lean"⟩,
     ⟨"spec-bolha", "cd juiz && LEAN_PATH=. lean -o Bolha.olean Bolha.lean"⟩,
     ⟨"ponte", "cd juiz && LEAN_PATH=. lean -o Ponte.olean Ponte.lean"⟩,
+    -- O ARREIO tambem precisa do proprio olean: `Correr.lean` faz `import Arreio`,
+    -- e `*.olean` esta no .gitignore. SEM este passo a cadeia so' roda em quem ja'
+    -- tem o olean de uma compilacao manual ANTIGA — que era o caso do Il, e NAO o
+    -- do atelie, onde o passo da mao falhava com "unknown module prefix 'Arreio'".
+    ⟨"arreio-olean", "cd arreio && LEAN_PATH=../juiz:. lean -o Arreio.olean Arreio.lean"⟩,
     ⟨"mao-escreve-a-cancao",
       "LEAN_PATH=juiz:arreio lean --run arreio/Correr.lean musica "
         ++ "exemplos/musica/letra.txt --titulo \"Canção de exemplo\" --interprete Exemplo"⟩,
@@ -94,7 +99,7 @@ def numero (raiz sufixo : String) : IO (Option String) := do
     no alfabeto, e por isso o canal publicava a CONSEQUÊNCIA (falta o
     Ponte.olean) em vez da CAUSA (o erro que quebrou o Bolha.lean). -/
 def ordemDaCadeia : List String :=
-  ["versao-do-lean", "hash-sha256", "spec-bolha", "ponte",
+  ["versao-do-lean", "hash-sha256", "spec-bolha", "ponte", "arreio-olean",
    "mao-escreve-a-cancao", "conformidade", "higiene-da-prosa"]
 
 /-- Apaga TODA prova e TODO marco — não só os da etapa pedida. Antes, `--etapa
