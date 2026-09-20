@@ -34,15 +34,32 @@ const CAMINHO_DECL = 'exemplos/deposito/objetos/';
 
 for (const b of ramos) {
   if (b.name === repo.default_branch) continue;
-  const c = await api(`/repos/${DONO}/${REPO}/commits/${b.commit.sha}`);
-  const msg = (c && c.commit && c.commit.message) || '';
-  // CANAL 1 — a declaração é uma BOLHA: o compromisso carrega o ENDEREÇO, e o
-  // prazo é um CAMPO lido do objeto, não um palpite sobre prosa.
-  const end = msg.match(/declaracao\s*:\s*([0-9a-f]{64})/i);
+  // CANAL 1 — a declaração é uma BOLHA: o compromisso carrega o ENDEREÇO, e o prazo
+  // é um CAMPO lido do objeto, não um palpite sobre prosa.
+  //
+  // O endereço é procurado no HISTÓRICO do ramo, e não só na PONTA. Ele nasce no
+  // compromisso que CRIOU a declaração, e exigir que todo compromisso posterior o
+  // repita é pedir que a prosa decaia — que é exatamente o defeito do canal 2. O
+  // custo desta busca é UMA chamada por ramo, com ou sem declaração.
+  // O mais RECENTE vence: se o ramo declarou duas vezes, vale a última.
+  const hist = (await api(`/repos/${DONO}/${REPO}/commits?sha=${b.name}&per_page=30`)) || [];
+  let end = null;
+  for (const c of hist) {
+    const m = ((c.commit && c.commit.message) || '').match(/declaracao\s*:\s*([0-9a-f]{64})/i);
+    if (m) { end = m; break; }
+  }
   if (end) {
     const obj = await api(`/repos/${DONO}/${REPO}/contents/${CAMINHO_DECL}${end[1]}?ref=${b.name}`);
     if (!obj || !obj.content) { semDeclaracao.push(`${b.name} (o endereço não resolve)`); continue; }
     const texto = Buffer.from(obj.content, 'base64').toString('utf8');
+    // A bolha DECLARA a que ramo pertence — o campo `ramo` existe para isso. Se o
+    // endereço aponta para a declaração de OUTRO ramo, ela não declara nada sobre
+    // este, e dizer "no prazo" seria falso. Campo declarado e não lido é enfeite.
+    const rr = texto.match(/^ramo:\s*(\S+)\s*$/m);
+    if (!rr || rr[1] !== b.name) {
+      semDeclaracao.push(`${b.name} (o endereço é de outro ramo: ${rr ? rr[1] : '?'})`);
+      continue;
+    }
     const campo = texto.match(/^prazo:\s*(\d{4}-\d{2}-\d{2})\s*$/m);
     if (!campo) { semDeclaracao.push(`${b.name} (a bolha não declara prazo)`); continue; }
     const prazo = new Date(campo[1] + 'T23:59:59Z');
