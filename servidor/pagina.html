@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>janela de contexto — acervo de bolhas</title>
+<style>
+:root{--f:#0f1115;--p:#171a21;--p2:#1e222b;--b:#2b3140;--t:#e6e8ee;--t2:#9aa3b5;
+--ac:#6ea8fe;--ok:#4ac48a;--av:#e3b341;--er:#e5674f;--ro:#c792ea}
+*{box-sizing:border-box}
+body{margin:0;background:var(--f);color:var(--t);font:14px/1.5 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:9;background:var(--p);border-bottom:1px solid var(--b);padding:10px 12px}
+.l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:650}
+.pil{margin-left:auto;font-size:11px;padding:3px 9px;border-radius:20px;background:var(--p2);border:1px solid var(--b);color:var(--t2);white-space:nowrap}
+.pil.viva{color:var(--ok);border-color:#25503c}
+.pil.morta{color:var(--av);border-color:#5a4a1f}
+button{font:inherit;color:var(--t);background:var(--p2);border:1px solid var(--b);border-radius:9px;padding:8px 12px;cursor:pointer}
+button:active{transform:translateY(1px)}
+.bp{background:var(--ac);color:#0b1020;border-color:var(--ac);font-weight:650}
+.bg{background:transparent}
+.tabs{display:flex;gap:6px;margin-top:10px}
+.tabs button{flex:1;padding:8px 6px}
+.tabs button[aria-selected=true]{background:var(--ac);color:#0b1020;border-color:var(--ac);font-weight:650}
+main{padding:12px;max-width:900px;margin:0 auto}
+section{display:none}section.on{display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:12px}
+.card{background:var(--p);border:1px solid var(--b);border-radius:11px;padding:10px}
+.card .v{font-size:20px;font-weight:700}
+.card .r{font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.04em}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--t2);margin:18px 0 8px}
+table{width:100%;border-collapse:collapse;background:var(--p);border:1px solid var(--b);border-radius:11px;overflow:hidden;font-size:13px}
+th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--b)}
+tr:last-child td{border-bottom:0}
+th{color:var(--t2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.m{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--t2)}
+.tag{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:20px;border:1px solid var(--b);background:var(--p2)}
+.d-perto{color:var(--er);font-weight:700}.d-medio{color:var(--av);font-weight:700}.d-longe{color:var(--ok)}
+.sec{border-left:2px solid var(--b);padding:3px 0 3px 9px;margin:3px 0;font-size:12.5px}
+.sec.n1{font-weight:650;color:var(--t)}.sec.n2{color:var(--t2)}.sec.n3{padding-left:20px;color:var(--t2);font-size:12px}
+#fala{min-height:180px;max-height:46vh;overflow:auto;background:var(--p);border:1px solid var(--b);border-radius:11px;padding:10px;margin-bottom:10px}
+.msg{margin:0 0 10px;padding:9px 11px;border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:13px}
+.eu{background:var(--ac);color:#0b1020;margin-left:12%}
+.sis{background:var(--p2);border:1px solid var(--b);margin-right:6%}
+.pre{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.45}
+#barra{display:flex;gap:8px;align-items:center}
+#q{flex:1;min-width:0;background:var(--p);border:1px solid var(--b);color:var(--t);border-radius:10px;padding:11px 12px;font:inherit}
+#acima{width:100%;margin-bottom:8px}
+.dica{font-size:11.5px;color:var(--t2);margin:6px 0}
+label{display:block;font-size:11.5px;color:var(--t2);margin:9px 0 3px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],select,textarea{width:100%;background:var(--p);border:1px solid var(--b);color:var(--t);border-radius:9px;padding:9px 10px;font:inherit}
+textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px}
+.av{background:#3a2a12;border-color:#6b4c1c;color:#f0c46a;padding:9px 11px;border-radius:9px;font-size:12.5px;margin-top:10px}
+.ok{background:#12301f;border-color:#25503c;color:#8fe0b5;padding:9px 11px;border-radius:9px;font-size:12.5px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="l1">
+    <h1>janela de contexto</h1>
+    <span class="pil" id="pil">conectando…</span>
+    <button class="bg" id="bnotif" style="padding:6px 10px;font-size:12px">🔔 notificações</button>
+  </div>
+  <div class="tabs">
+    <button id="t-painel" aria-selected="true">painel</button>
+    <button id="t-conversa" aria-selected="false">conversa</button>
+    <button id="t-compor" aria-selected="false">compor</button>
+  </div>
+</header>
+<main>
+  <section id="s-painel" class="on">
+    <div class="cards" id="cards"></div>
+    <h2>por espécie</h2><table id="t-especie"></table>
+    <h2>prazos declarados</h2><table id="t-prazo"></table>
+    <h2>depósitos que o acervo declara a si mesmo</h2><table id="t-caminho"></table>
+    <h2>itinerário</h2><div id="itinerario"></div>
+  </section>
+  <section id="s-conversa">
+    <div id="fala"></div>
+    <button id="acima" class="bp">⟳ sincronizar o acervo agora</button>
+    <div id="barra">
+      <input id="q" type="text" placeholder="pergunte ao acervo — ex: prazos / quantos / ajuda" autocomplete="off">
+      <button class="bp" id="enviar">enviar</button>
+    </div>
+    <p class="dica" id="modo"></p>
+  </section>
+  <section id="s-compor">
+    <p class="dica">a forma de cada espécie é lida do próprio dado. escolha a espécie e os campos aparecem.</p>
+    <label for="esp">espécie</label>
+    <select id="esp"></select>
+    <div id="campos"></div>
+    <div id="prev"></div>
+  </section>
+</main>
+<script>
+let DADOS = __SNAPSHOT__;
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let modo = "estatico", vivo = false;
+try { modo = (location.protocol==="file:") ? "estatico" : "servidor"; } catch(e){}
+
+function abrir(qual){
+  ["painel","conversa","compor"].forEach(x=>{
+    document.getElementById("s-"+x).classList.toggle("on", x===qual);
+    document.getElementById("t-"+x).setAttribute("aria-selected", String(x===qual));
+  });
+}
+["painel","conversa","compor"].forEach(x=>{
+  document.getElementById("t-"+x).onclick = ()=>abrir(x);
+});
+
+function render(d){
+  DADOS = d;
+  document.getElementById("cards").innerHTML = [
+    ["objetos", d.total], ["bytes", d.bytes],
+    ["espécies", Object.keys(d.por_especie||{}).length],
+    ["depósitos", Object.keys(d.por_deposito||{}).length]
+  ].map(([r,v])=>`<div class="card"><div class="v">${esc(v)}</div><div class="r">${esc(r)}</div></div>`).join("");
+
+  let h = "<tr><th>espécie</th><th>qtd</th><th>licença exigida</th></tr>";
+  const esp = d.especies||{}, eix = d.por_especie||{};
+  Object.keys(eix).sort((a,b)=>eix[b]-eix[a]).forEach(k=>{
+    const e = esp[k];
+    h += `<tr><td>${esc(k)}</td><td>${eix[k]}</td><td class="m">${e?esc(e.licenca_exigida):"—"}</td></tr>`;
+  });
+  document.getElementById("t-especie").innerHTML = h;
+
+  let p = "<tr><th>ramo</th><th>prazo</th><th>resta</th></tr>";
+  const ds = d.declaracoes||[];
+  if(!ds.length) p += '<tr><td colspan="3" class="m">nenhuma declaração no acervo lido</td></tr>';
+  ds.forEach(x=>{
+    let c="", t="sem prazo";
+    if(x.dias!==null && x.dias!==undefined){
+      t = x.dias+" d"; c = x.dias<0?"d-perto":(x.dias<=10?"d-perto":(x.dias<=45?"d-medio":"d-longe"));
+      if(x.dias<0) t = "VENCIDO há "+Math.abs(x.dias)+" d";
+    }
+    p += `<tr><td class="m">${esc(x.ramo)}</td><td class="m">${esc(x.prazo)}</td><td class="${c}">${esc(t)}</td></tr>`;
+  });
+  document.getElementById("t-prazo").innerHTML = p;
+
+  let c = "<tr><th>nome</th><th>padrão</th><th>sigilo</th></tr>";
+  const cs = d.caminhos||[];
+  if(!cs.length) c += '<tr><td colspan="3" class="m">o acervo não declara caminho neste depósito</td></tr>';
+  cs.forEach(x=>{
+    c += `<tr><td>${esc(x.nome)}</td><td class="m">${esc(x.padrao)}</td><td>${x.sigilo?`<span class="tag">${esc(x.sigilo)}</span>`:'<span class="m">campo não existe</span>'}</td></tr>`;
+  });
+  document.getElementById("t-caminho").innerHTML = c;
+
+  const it = d.itinerario;
+  document.getElementById("itinerario").innerHTML = it
+    ? `<p class="m">${esc(it.endereco)} · ${it.bytes} bytes · em ${esc(it.deposito)} · apontado por ${(it.apontado_por||[]).length} objeto(s)</p>`
+      + (it.secoes||[]).map(s=>`<div class="sec n${Math.min(s.nivel,3)}">${esc(s.titulo)}</div>`).join("")
+    : '<p class="m">não achei um itinerário no acervo lido</p>';
+
+  const sel = document.getElementById("esp"), antes = sel.value;
+  sel.innerHTML = Object.keys(esp).sort().map(k=>`<option>${esc(k)}</option>`).join("");
+  if(antes) sel.value = antes;
+  if(!document.getElementById("campos").children.length) camposDe();
+
+  document.getElementById("modo").textContent =
+    modo==="servidor" ? ("modo servidor · "+(vivo?"tempo real ligado":"tempo real caiu — usando sondagem"))
+                      : "modo estático (arquivo aberto direto) · os dados são o retrato do momento em que a página foi gerada";
+  const pil = document.getElementById("pil");
+  pil.textContent = (vivo?"● ao vivo":(modo==="servidor"?"○ sondando":"○ estático"))+" · "+d.assinatura;
+  pil.className = "pil"+(vivo?" viva":(modo==="servidor"?"":" morta"));
+}
+
+function avisar(d){
+  try{
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    const n = Object.values(d.por_especie||{}).reduce((a,b)=>a+b,0);
+    new Notification("o acervo mudou", {body:n+" objetos · assinatura "+d.assinatura, tag:"bolhas"});
+  }catch(e){}
+}
+
+function conectar(){
+  if(modo!=="servidor"){ render(DADOS); return; }
+  try{
+    const ev = new EventSource("api/eventos");
+    ev.onmessage = e => { const d = JSON.parse(e.data); render(d); if(d.mudou) avisar(d); vivo = true; };
+    ev.onerror = () => { vivo = false; ev.close(); sondar(); };
+  }catch(e){ sondar(); }
+  sondar();
+}
+let tmp=null;
+function sondar(){
+  clearInterval(tmp);
+  tmp = setInterval(async ()=>{
+    try{
+      const r = await fetch("api/estado",{cache:"no-store"});
+      const d = await r.json();
+      const mudou = d.assinatura !== (DADOS&&DADOS.assinatura);
+      render(d); if(mudou) avisar(d);
+    }catch(e){ vivo=false; document.getElementById("modo").textContent = "servidor não respondeu — os dados na tela são o último retrato"; }
+  }, 5000);
+}
+
+async function perguntar(q){
+  const fala = document.getElementById("fala");
+  fala.innerHTML += `<div class="msg eu">${esc(q)}</div>`;
+  fala.scrollTop = fala.scrollHeight;
+  let r;
+  if(modo!=="servidor"){
+    r = "modo estático: a conversa precisa do servidor.\n\nrode:\n  python3 servidor/servidor.py\n\ne abra http://127.0.0.1:8787/";
+  } else {
+    try{
+      const resp = await fetch("api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q})});
+      r = (await resp.json()).resposta;
+    }catch(e){ r="não consegui falar com o servidor: "+e; }
+  }
+  fala.innerHTML += `<div class="msg sis pre">${esc(r)}</div>`;
+  fala.scrollTop = fala.scrollHeight;
+}
+
+function camposDe(){
+  const esp = (DADOS.especies||{})[document.getElementById("esp").value];
+  const rel = (DADOS.relacoes||{});
+  if(!esp){ document.getElementById("campos").innerHTML=""; return; }
+  document.getElementById("campos").innerHTML = esp.campos.map(c=>
+    `<label for="c_${esc(c)}">${esc(c)} <span style="text-transform:none">· ${esc(rel[c]||"?")}</span></label>`
+    + `<input type="text" id="c_${esc(c)}" data-campo="${esc(c)}" placeholder="${c==="licenca"?"vazio = reservado":""}">`
+  ).join("");
+  document.getElementById("prev").innerHTML = "";
+}
+
+async function compor(){
+  const esp = document.getElementById("esp").value;
+  const valores = {};
+  document.querySelectorAll("#campos input").forEach(i=>{ valores[i.dataset.campo] = i.value; });
+  if(modo!=="servidor"){
+    document.getElementById("prev").innerHTML = '<div class="av">compor precisa do servidor (o endereço é o sha256 dos bytes, calculado lá).</div>';
+    return;
+  }
+  const r = await fetch("api/compor",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({especie:esp,valores})});
+  const d = await r.json();
+  let h = `<h2>o objeto, como ele seria</h2><textarea readonly>${esc(d.texto||"")}</textarea>
+    <p class="m">endereço (sha256 dos bytes): <b>${esc(d.endereco||"")}</b> · ${d.bytes} bytes</p>`;
+  if(d.ja_existe) h += '<div class="ok">este endereço JÁ EXISTE no acervo — o mesmo conteúdo tem o mesmo nome. Nada a gravar.</div>';
+  if(d.faltando && d.faltando.length) h += `<div class="av">faltam campos: <b>${esc(d.faltando.join(", "))}</b> — o objeto acima NÃO está completo, e portanto o endereço não vale como o de um objeto canônico.</div>`;
+  h += '<p class="dica">esta janela só COMPÕE e mostra o endereço. Gravar é um ato separado, e deliberado.</p>';
+  document.getElementById("prev").innerHTML = h;
+}
+
+document.getElementById("esp").onchange = camposDe;
+document.getElementById("enviar").onclick = ()=>{
+  const i = document.getElementById("q"); const q = i.value.trim(); if(!q) return; i.value=""; perguntar(q);
+};
+document.getElementById("q").onkeydown = e => { if(e.key==="Enter") document.getElementById("enviar").click(); };
+document.getElementById("acima").onclick = async ()=>{
+  if(modo!=="servidor"){ render(DADOS); return; }
+  const r = await fetch("api/estado",{cache:"no-store"}); render(await r.json());
+};
+document.getElementById("bnotif").onclick = async ()=>{
+  try{
+    const p = await Notification.requestPermission();
+    document.getElementById("bnotif").textContent = p==="granted" ? "🔔 notificações ligadas" : "🔔 recusadas";
+  }catch(e){ document.getElementById("bnotif").textContent = "🔔 indisponível"; }
+};
+render(DADOS);
+conectar();
+perguntar("ajuda");

@@ -12,3 +12,6 @@ MAPA.md
 # e por isso a regra vive em .git/info/exclude (local, nao compartilhado).
 /prova-*.txt
 /recibo-*.txt
+
+# marcador de falha da cadeia: nasce numa corrida e morre na seguinte
+.falhou-*
