@@ -138,7 +138,7 @@ def main():
         # Quarenta e Cinc"). Entao a SINTESE vai na linha de baixo: cortada, ela
         # sumiria em silencio.
         nome, _, sint = n.partition(" — ")
-        print("  %s %-26s %-11s %s  %s" % (marca[niv], nome[:26], esp, h[:12], porque))
+        print("  %s %-30s %-11s %s  %s" % (marca[niv], nome[:30], esp, h[:12], porque))
         if sint: print("        %s" % sint)
     c3 = sum(1 for s in saida if s[0] == 3)
     print()
