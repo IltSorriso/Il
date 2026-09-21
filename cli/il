@@ -16,14 +16,11 @@ set -u
 IL_RAIZ=${IL_RAIZ:-$(cd "$(dirname "$0")/.." && pwd)}
 DEP=${IL_DEPOSITO:-$IL_RAIZ/exemplos/deposito/objetos}
 QUEB=${IL_QUEBRADOS:-$IL_RAIZ/exemplos/quebrados/objetos}
+AQUI=$(dirname "$0")
 
 # o INDICE DE NOMES: nome|especie|endereco. UMA passada, UM processo.
 # GERADO a cada chamada: nao ha arquivo de indice para apodrecer.
 indice() {
-  # O NOME e' o campo `nome` quando a especie o tem. `anotacao`, `declaracao`,
-  # `musica` e `parte` NAO o tem — e o projeto nao declarou, ate agora, QUAL
-  # campo carrega o nome de cada especie. Ate declarar, esta e' a reserva, e
-  # ela e' VISIVEL: e' uma convencao do CLI, nao uma lei do juiz.
   awk 'FNR==1 { if (NR>1 && tipo!="") printf "%s|%s|%s\n", (nome==""?"-":nome), tipo, arq
                 arq=FILENAME; sub(".*/","",arq); tipo=""; nome="" }
        /^tipo: /   { if (tipo=="") tipo=substr($0,7) }
@@ -36,7 +33,44 @@ indice() {
 }
 linhas() { printf '%s\n' "$IDX" | awk -F'|' -v f="$1" 'f==""||$2==f {printf "  %-28s %-11s %s\n",$1,$2,substr($3,1,12)}'; }
 
-case "${1:-ajuda}" in
+# A CAMADA VEM DE BOLHA. Aqui so' se LE': a especificacao e os casos de uso
+# estao no texto da bolha, nao neste arquivo.
+camada() {
+  for f in "$DEP"/*; do
+    [ "$(sed -n '1p' "$f" 2>/dev/null)" = "tipo: proposito" ] || continue
+    [ "$(sed -n 's/^nome: //p' "$f" 2>/dev/null | head -1)" = "$1" ] || continue
+    t=$(sed -n 's/^texto: //p' "$f" 2>/dev/null | head -1)
+    [ -f "$DEP/$t" ] && cat "$DEP/$t" || echo "  (o texto da camada '$1' NAO esta no deposito)"
+    return 0
+  done
+  echo "  (a camada '$1' NAO esta no deposito) — dito em voz alta, nao silenciado"
+}
+
+ajuda() {
+  echo "il — os comandos, por camada."
+  echo
+  echo "A CAMADA VEM DE BOLHA: abaixo, a especificacao e os casos de uso saem do"
+  echo "texto da propria bolha no deposito. Onde se le' COMO CHAMAR, a lista e'"
+  echo "CONVENCAO DO CLI — nao lei do juiz, e por isso ela se diz convencao."
+  echo
+  for c in camada-1-estado camada-2-verificar camada-3-criar camada-4-manter; do
+    case "$c" in
+      camada-1-estado)    echo "════════ CAMADA 1 — ESTADO (le' tudo, nao escreve nada) ════════"
+        camada "$c"; echo; echo "  COMO CHAMAR:  il estado [--nomes|--janelas]   ·   il nome <nome>" ;;
+      camada-2-verificar) echo "════════ CAMADA 2 — VERIFICAR (o portao de entrada) ════════"
+        camada "$c"; echo; echo "  COMO CHAMAR:  il verificar   ·   il guarda   ·   il varredura" ;;
+      camada-3-criar)     echo "════════ CAMADA 3 — CRIAR (a mao que escreve) ════════"
+        camada "$c"; echo; echo "  COMO CHAMAR:  il nota \"texto\"   ·   il nota --apagar <endereco>   ·   il nota --listar" ;;
+      camada-4-manter)    echo "════════ CAMADA 4 — MANTER (o que vence e o que apodrece) ════════"
+        camada "$c"; echo; echo "  COMO CHAMAR:  il alertas   ·   il nomes [--gerar]   ·   il manter <o que>" ;;
+    esac
+    echo
+  done
+  echo "  il comandos   esta ajuda   ·   il ajuda   o mesmo"
+}
+
+case "${1:-comandos}" in
+  comandos|ajuda) ajuda ;;
   estado)
     IDX=$(indice)
     echo "estado do sistema — GERADO em $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -51,23 +85,13 @@ case "${1:-ajuda}" in
       *)         linhas "" ;;
     esac ;;
   nome)     IDX=$(indice); printf '%s\n' "$IDX" | grep "^$2|" || echo "nao existe janela com o nome '$2'" ;;
-  alertas)  exec "$(dirname "$0")/alertas" ;;
-  nomes)    shift; exec "$(dirname "$0")/nomes" "$@" ;;
-  guarda)   exec "$(dirname "$0")/guarda" ;;
+  alertas)  exec "$AQUI/alertas" ;;
+  nomes)    shift; exec "$AQUI/nomes" "$@" ;;
+  guarda)   exec "$AQUI/guarda" ;;
+  nota)     shift; exec "$AQUI/nota" "$@" ;;
+  varredura) exec "$AQUI/varredura" ;;
   verificar) echo "camada 2 — verificar"; echo "  porta: nada sobe sem esta camada verde"; echo "  corrida inteira:  lean --run cadeia/Cadeia.lean --etapa tudo" ;;
-  criar)     echo "camada 3 — criar: janelas · musica · bolha (toda criacao passa pela camada 2 depois)" ;;
+  criar)     echo "camada 3 — criar: il nota · janelas · musica (toda criacao passa pela camada 2 depois)" ;;
   manter)    echo "camada 4 — manter: prazos · ramos · janelas" ;;
-  *)
-    echo "il — as quatro camadas"
-    echo
-    echo "  il estado [--nomes|--janelas]   camada 1: le' tudo, nao escreve nada"
-    echo "  il verificar                    camada 2: o portao de entrada"
-    echo "  il criar <o que>                camada 3: a mao que escreve"
-    echo "  il manter <o que>               camada 4: o que vence e apodrece"
-    echo "  il nome <nome>                  o endereco da janela com esse nome"
-    echo "  il alertas                      o nivel por FATOS, bolha + metadados + itinerario"
-    echo "  il nomes [--gerar]              apelidos provisorios, por prioridade"
-    echo "  il guarda                       recusa julgar com compilado velho"
-    echo
-    echo "  as camadas vem de bolhas de especie proposito no deposito" ;;
+  *)         echo "comando desconhecido: $1"; echo; ajuda ;;
 esac

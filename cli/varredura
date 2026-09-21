@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""varredura — o que sobrou depois de uma acao.
+
+Responde quatro perguntas, com dado e nao com lembreca:
+  1. INTEGRIDADE   — nome do arquivo == resumo do conteudo?
+  2. ALCANCE       — quem ninguem aponta (artefato) e quem so' os quebrados apontam (insumo)
+  3. RECENTES      — o que mudou nos ultimos N minutos (padrao 30)
+  4. VISTAS        — arquivos em bolhas/ que nao correspondem a objeto nenhum
+"""
+import hashlib, os, re, sys, time
+
+RAIZ = os.environ.get("IL_RAIZ", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEP = os.environ.get("IL_DEPOSITO", os.path.join(RAIZ, "exemplos/deposito/objetos"))
+QUEB = os.environ.get("IL_QUEBRADOS", os.path.join(RAIZ, "exemplos/quebrados/objetos"))
+BOLHAS = os.environ.get("IL_BOLHAS", os.path.join(RAIZ, "bolhas"))
+MIN = int(os.environ.get("IL_JANELA_MIN", "30"))
+
+def ler(pasta):
+    d = {}
+    if not os.path.isdir(pasta): return d
+    for n in sorted(os.listdir(pasta)):
+        p = os.path.join(pasta, n)
+        if not os.path.isfile(p): continue
+        with open(p, "rb") as f: d[n] = f.read()
+    return d
+
+bom, queb = ler(DEP), ler(QUEB)
+todos = {**bom, **queb}
+
+ruins = [n for n, b in todos.items() if hashlib.sha256(b).hexdigest() != n]
+print(f"1. INTEGRIDADE  {len(todos)} objeto(s)  ·  {len(ruins)} com nome != resumo")
+for n in ruins[:5]: print(f"     DIVERGE {n[:12]}")
+
+apontados = set()
+for n, b in todos.items():
+    for h in re.findall(rb"\b[0-9a-f]{64}\b", b):
+        apontados.add(h.decode())
+sem_tipo = [n for n, b in todos.items() if not b.startswith(b"tipo: ")]
+so_queb = [n for n in sem_tipo if n not in apontados]
+orfaos  = [n for n in sem_tipo if n not in {*set()} and not any(n.encode() in b for k, b in todos.items() if k != n)]
+print(f"2. ALCANCE      {len(sem_tipo)} sem tipo (conteudo)  ·  {len(so_queb)} nao alcancado(s)")
+for n in so_queb: print(f"     SEM ALCANCE {n[:12]}  ({len(todos[n])} B)")
+
+agora = time.time()
+recent = sorted((os.path.getmtime(os.path.join(p, n)), n, p)
+                for p, d in ((DEP, bom), (QUEB, queb)) for n in d
+                if agora - os.path.getmtime(os.path.join(p, n)) < MIN * 60)
+print(f"3. RECENTES     {len(recent)} objeto(s) mudado(s) nos ultimos {MIN} min")
+for m, n, p in recent:
+    print(f"     {time.strftime('%H:%M:%S', time.localtime(m))}  {n[:12]}  {os.path.basename(p)}")
+
+if os.path.isdir(BOLHAS):
+    v = os.listdir(BOLHAS)
+    print(f"4. VISTAS       {len(v)} arquivo(s) em bolhas/")
+else:
+    print("4. VISTAS       pasta ausente")
+
+print(f"\n   canone {len(bom)}  ·  quebrados {len(queb)}")

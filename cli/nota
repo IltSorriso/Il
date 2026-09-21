@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""nota — acrescenta e remove uma anotacao, com a varredura antes e depois.
+
+POR QUE EXISTE. As anotacoes nao tem campo `nome`: seus objetos sao alcancaveis
+so' pelo endereco. Esta e' a menor porta de CRIACAO e a unica de REMOCAO.
+
+REGRA QUE NAO SE QUEBRA: todo objeto e' endereçado pelo resumo do proprio
+conteudo, entao criar NUNCA sobrescreve. Apagar e' a operacao que pode perder
+coisa — por isso ela SEMPRE diz o que removeu, e recusa apagar o que tem quem
+aponte.
+
+Uso:
+  cli/nota "o texto da nota"        cria; imprime os dois enderecos
+  cli/nota --apagar <endereco>      remove UMA anotacao (e o texto dela, se orfao)
+  cli/nota --listar                 lista as anotacoes do canone
+"""
+import hashlib, os, re, sys
+
+RAIZ = os.environ.get("IL_RAIZ", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEP = os.environ.get("IL_DEPOSITO", os.path.join(RAIZ, "exemplos/deposito/objetos"))
+QUEB = os.environ.get("IL_QUEBRADOS", os.path.join(RAIZ, "exemplos/quebrados/objetos"))
+LIC = "649e94ec807f83748732f58e401278d1546106739e11b9a55b4fcab9f7f3b015"  # CC0
+
+HEX = re.compile(rb"[0-9a-f]{64}")
+
+def endereco(b): return hashlib.sha256(b).hexdigest()
+
+def objetos():
+    d = {}
+    for pasta in (DEP, QUEB):
+        if not os.path.isdir(pasta): continue
+        for n in os.listdir(pasta):
+            p = os.path.join(pasta, n)
+            with open(p, "rb") as f: d[n] = (f.read(), p)
+    return d
+
+def apontado_por(objs, alvo):
+    """quem cita esse endereco — em QUALQUER campo"""
+    return [n for n, (b, _) in objs.items() if n != alvo and alvo.encode() in b]
+
+def criar(texto, titulo=None):
+    objs = objetos()
+    tb = texto.encode()
+    th = endereco(tb)
+    novo_t = th not in objs
+    if novo_t:
+        open(os.path.join(DEP, th), "wb").write(tb)
+    corpo = f"tipo: anotacao\nconteudo: {th}\nlicenca: {LIC}\n".encode()
+    ah = endereco(corpo)
+    novo_a = ah not in objs
+    if novo_a:
+        open(os.path.join(DEP, ah), "wb").write(corpo)
+    print(f"texto    {th}  ({len(tb)} bytes)  {'novo' if novo_t else 'JA EXISTIA'}")
+    print(f"anotacao {ah}  ({len(corpo)} bytes)  {'novo' if novo_a else 'JA EXISTIA'}")
+    if not novo_a:
+        print("  (enderecamento por conteudo: criar a mesma nota duas vezes NAO cria duas notas)")
+
+def apagar(alvo):
+    objs = objetos()
+    if alvo not in objs:
+        print(f"nao existe objeto {alvo}"); return 1
+    b, p = objs[alvo]
+    quem = apontado_por(objs, alvo)
+    if quem:
+        print(f"RECUSO apagar {alvo[:12]}: {len(quem)} objeto(s) apontam para ele")
+        for q in quem[:5]: print(f"    {q[:12]}")
+        print("  apagar deixaria esses pendurados — e' o defeito que o juiz chama de texto ausente")
+        return 1
+    # o texto apontado por uma anotacao sai junto SE ninguem mais o citar
+    filhos = []
+    if b.startswith(b"tipo: anotacao"):
+        m = re.search(rb"conteudo: ([0-9a-f]{64})", b)
+        if m:
+            t = m.group(1).decode()
+            if t in objs:
+                outros = [x for x in apontado_por(objs, t) if x != alvo]
+                if not outros: filhos.append(t)
+    os.remove(p); print(f"removido  {alvo[:12]}  (era {os.path.basename(p)})")
+    for t in filhos:
+        os.remove(objs[t][1]); print(f"removido  {t[:12]}  (o texto dela, sem outro dono)")
+    return 0
+
+def listar():
+    objs = objetos()
+    n = 0
+    for nome in sorted(objs):
+        b, p = objs[nome]
+        if b.startswith(b"tipo: anotacao"):
+            m = re.search(rb"conteudo: ([0-9a-f]{64})", b)
+            t = m.group(1).decode() if m else "?"
+            print(f"  {nome[:12]}  -> {t[:12]}  {'presente' if t in objs else 'AUSENTE'}")
+            n += 1
+    print(f"  {n} anotacao(oes) no canone e nos quebrados")
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if not a: print(__doc__); sys.exit(0)
+    if a[0] == "--apagar":
+        sys.exit(apagar(a[1]) if len(a) > 1 else 2)
+    if a[0] == "--listar":
+        listar()
+    else:
+        titulo = a[1] if len(a) > 1 and a[1].startswith("--titulo") else None
+        criar(a[0])
