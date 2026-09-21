@@ -43,16 +43,37 @@ def todos():
             f = os.path.join(pasta, h)
             if os.path.isfile(f): yield h, f, prov
 
+def tronco():
+    """O ramo principal DESTE repositorio. NUNCA um nome fixo: o Il chama o dele de
+    pindorama, o atelie de atelie, e o alertas roda nos dois. Fixar o nome faz o
+    veredito DEPENDER do repositorio — e o defeito fica invisivel, porque a resposta
+    errada e' uma resposta. Procura na ordem e fica com o primeiro que resolver."""
+    for c in ("refs/remotes/origin/HEAD", "refs/heads/pindorama",
+              "refs/heads/main", "refs/heads/master"):
+        r = subprocess.run(["git", "-C", raiz, "symbolic-ref", "--short", c],
+                           capture_output=True, text=True, timeout=20)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip().replace("origin/", "")
+        v = subprocess.run(["git", "-C", raiz, "rev-parse", "--verify", "--quiet", c],
+                           capture_output=True, timeout=20)
+        if v.returncode == 0:
+            return c.replace("refs/heads/", "").replace("refs/remotes/origin/", "")
+    r = subprocess.run(["git", "-C", raiz, "symbolic-ref", "--short", "HEAD"],
+                       capture_output=True, text=True, timeout=20)
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+
 def ramos():
-    """os ramos locais com trabalho NAO fundido na pindorama"""
+    """os ramos locais com trabalho NAO fundido na linha principal DESTE repositorio"""
+    t = tronco()
+    if not t: return []
     try:
         r = subprocess.run(["git", "-C", raiz, "branch", "--format=%(refname:short)"],
                            capture_output=True, text=True, timeout=20)
         todos_r = [b.strip() for b in r.stdout.splitlines() if b.strip()]
         fora = []
         for b in todos_r:
-            if b == "pindorama": continue
-            m = subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", b, "pindorama"],
+            if b == t: continue
+            m = subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", b, t],
                                capture_output=True, timeout=20)
             if m.returncode != 0: fora.append(b)
         return fora
@@ -75,11 +96,12 @@ def adicionado_em(f):
         return None
 
 def fundido(f):
-    """True quando o ramo que criou a declaracao ja' esta' DENTRO da pindorama"""
+    """True quando o ramo que criou a declaracao ja' esta' na linha principal"""
+    t = tronco()
     c = adicionado_em(f)
-    if not c: return False
+    if not t or not c: return False
     try:
-        return subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", c, "pindorama"],
+        return subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", c, t],
                               capture_output=True, timeout=30).returncode == 0
     except Exception:
         return False
@@ -175,6 +197,7 @@ def main():
     marca = {3: "[!!!]", 2: "[ ! ]", 1: "[   ]"}
     print("ALERTAS — nivel por FATOS, nao por opiniao")
     print("  entram na conta: a bolha · os metadados · a conformidade com o itinerario")
+    print("  linha principal: %s (medida no git, nao suposta)" % (tronco() or "?"))
     print()
     for n, rot, alvo, motivo in alertas:
         print("  %s %-28s %-14s %s" % (marca[n], rot, alvo[:14], motivo))
