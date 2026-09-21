@@ -74,16 +74,43 @@ def nivel(c, prov, h):
     if "nome" not in c:    return 2, "SEM NOME PROPRIO — apelido provisorio"
     return 1, "nomeado"
 
-def apelido(h, f, c, memo, usar_modelo):
+def meta_janela(h, f, c, prov, alcancado_por):
+    """A META-JANELA-MODULAR em miniatura: o recorte que o modelo recebe.
+
+    Nao so' o CONTEUDO — ONDE o objeto esta', de que especie, de que ramo, e
+    quem o alcanca. Sem o ambito o modelo nao tem como distinguir, e foi medido:
+    as duas anotacoes 00de629d (CC0) e 3ac5e94f (reservado), que diferem SO' na
+    licenca, receberam ambas "Anotacao de verdade". Mesmo nome para duas coisas
+    diferentes e' a mesma classe de defeito do guarda que confundia Il com IltS.
+    """
+    p = ["especie: %s" % (c.get("tipo") or "conteudo (sem tipo)"),
+         "procedencia: %s" % prov]
+    for k in ("nome","ramo","prazo","numero","papel","titulo","catalogo","sigilo"):
+        if k in c: p.append("%s: %s" % (k, c[k]))
+    if alcancado_por: p.append("apontado por %d objeto(s)" % alcancado_por)
+    return "; ".join(p)
+
+def apelido(h, f, c, memo, usar_modelo, recorte=""):
     if "nome" in c: return c["nome"], False
     if h in memo:   return memo[h], True
     if not usar_modelo: return "-", False
     t = texto_de(h, f, c)[:600].replace("\n", " ")
+    pedido = ("Voce nomeia objetos de um acervo endereçado por conteudo. Recebera "
+              "o RECORTE de um objeto (especie, procedencia, campos) e o TEXTO dele.\n"
+              "Responda com DUAS linhas e nada mais:\n"
+              "NOME: duas a quatro palavras, sem pontuacao, em portugues\n"
+              "SINTESE: uma linha curta dizendo o que o objeto E' DENTRO DESTE acervo\n\n"
+              "RECORTE: " + (recorte or "nao declarado") + "\n\nTEXTO: " + t)
     try:
         r = subprocess.run([os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelo"),
-             "Responda APENAS com duas a quatro palavras, sem pontuacao, em portugues, "
-             "nomeando este conteudo: " + t], capture_output=True, text=True, timeout=70)
-        n = r.stdout.strip().splitlines()[-1].strip() if r.stdout.strip() else "-"
+             pedido], capture_output=True, text=True, timeout=70)
+        linhas = [l.strip() for l in r.stdout.strip().splitlines() if l.strip()]
+        nome = sint = ""
+        for l in linhas:
+            if l.upper().startswith("NOME:"):    nome = l.split(":",1)[1].strip()
+            elif l.upper().startswith("SINTESE"): sint = l.split(":",1)[1].strip()
+        if not nome and linhas: nome = linhas[-1]
+        n = (nome + " — " + sint) if sint else nome
     except Exception: n = "-"
     if n: memo[h] = n
     return n, True
@@ -96,7 +123,7 @@ def main():
         if not c: continue
         esp = c.get("tipo", "-")
         if esp in ("campo", "especie", "caminho", "vocabulario", "licenca"): continue
-        n, gerado = apelido(h, f, c, novos, usar_modelo)
+        n, gerado = apelido(h, f, c, novos, usar_modelo, meta_janela(h, f, c, prov, 0))
         niv, porque = nivel(c, prov, h)
         saida.append((niv, n, esp, h, porque))
     if usar_modelo: cache(False, novos)
