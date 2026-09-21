@@ -1,0 +1,58 @@
+encerramento: 36479985ce63632464e97ecd59f687ba0750121d5e660133827461aeeb8716a5
+encerramento: 7c5fc04da704e188d04139a0d65403b5c7bf4ca9a2bd012d5b91a1744cbbbfd1
+encerramento: 87a0b1172b3a7ebc2f7968230f3da35ac68e9692dc07dc5519079bbeb0db3aca
+encerramento: f95c8dd97556e8cf82e100761f8c93dc64903a3f523d579ed77916e79b887926
+
+AS A5 DE RAMO EXTINTO, COM O VEREDITO DE CADA UMA.
+
+Toda declaracao do canone nomeia um ramo no campo `ramo`, e NENHUM dos seis ramos
+citados existe mais: a fusao de 21 de setembro os apagou, e so' a pindorama ficou.
+Isso nao e' defeito — e' o fim normal de um ramo. O defeito era o dado nao distinguir
+dois casos que se parecem: ramo FUNDIDO (o trabalho chegou) e ramo ABANDONADO (nao
+chegou). As duas coisas nomeiam um ramo que nao existe.
+
+A DISTINCAO JA' ESTAVA NO REPOSITORIO, e agora o alertas a le': o compromisso que
+ADICIONOU a declaracao e' ancestral da pindorama? Se for, o ramo foi fundido, e a
+declaracao e' memoria. Se nao for, ela ficou presa num ramo que nunca se juntou — e
+isso e' divida de verdade, que continua gritando. Nenhuma lista escrita a mao.
+
+O QUE ESTE REGISTRO ACRESCENTA, e o git nao podia dizer: o VEREDITO sobre o criterio
+de descarte de cada A5. Ramo fundido nao quer dizer pergunta respondida.
+
+  A5 36479985 — itinerario/declaracao-em-bolha, prazo 2026-10-03 — ENCERRADA.
+  A pergunta: acrescentar especie ao juiz custa so' DADO, ou exige reforma? E a A5
+  pode viver como bolha, em vez de prosa no compromisso? Respondida: sim para as duas.
+  A especie `declaracao` entrou sem tocar em especie nenhuma, e outras duas entraram
+  depois pelo mesmo caminho. O criterio de descarte — tocar em prova nao mecanica, ou
+  mudar um endereco — nao se aplicou. RESSALVA, e ela e' a pergunta da A5 be044d33:
+  acrescentar especie ainda passa por uma linha no registro literal em Lean.
+
+  A5 7c5fc04d — spec/caminho-sigilo, prazo 2026-09-29 — ENCERRADA.
+  A pergunta: o RECIPIENTE declara a propria visibilidade, e o juiz LE? Respondida:
+  o juiz passou a ler os caminhos em vez de repetir os tres como texto literal, a
+  procedencia de cada objeto sobrevive a fusao numa lista plana, e a lei "bolha privada
+  nao mora em caminho publico" morde — o teste negativo a faz disparar. O criterio de
+  descarte (o leitor mudar a cada deposito novo) nao se aplicou: deposito novo e' bolha
+  nova, e o leitor fica quieto.
+
+  A5 87a0b117 e A5 f95c8dd9 — spec/ e itinerario/capacidades-nao-portadas, prazo
+  2026-11-30 — ENCERRADAS QUANTO AO AMBITO.
+  Declaravam o mesmo trabalho por dois ramos, e os dois foram fundidos. O levantamento
+  e a lista das cinco posicoes estao no canone. O que NAO e' deste escopo: a execucao
+  de cada posicao, que abre trabalho proprio e precisa da propria declaracao.
+
+  A5 be044d33 — spec/vocabulario-em-bolha, prazo 2026-10-24 — NAO ENCERRADA, e de
+  proposito SEM linha de encerramento aqui.
+  O ramo foi fundido, mas a pergunta tem parte VIVA: o vocabulario do juiz ainda e'
+  declarado duas vezes — a bolha vocabulario e o registroEspecies em Lean — e
+  acrescentar propriedade a uma especie ainda exige mexer no leitor. O criterio dela:
+  se o vocabulario em bolha exigir que o leitor mude a cada especie nova, o ganho era
+  ilusorio. Hoje ele EXIGE. Essa A5 precisa de ramo NOVO, vivo, e nao de encerramento.
+
+O INSUMO DE TESTE NAO ENTRA AQUI. A declaracao de prazo malformado (2026-13-45) mora
+em exemplos/quebrados/objetos: o `ramo` dela e' rotulo de teste, nao compromisso. Ela
+e' o unico caso que exercita a regra do prazo, e ja' tem nome proprio numa A5.
+
+POR QUE NENHUMA DECLARACAO E' REESCRITA. O endereco de cada uma esta' citado em
+mensagem de compromisso, e endereco citado tem de resolver; mudar um campo custa
+endereco novo. Entao as declaracoes ficam como estao, e o que muda e' a LEITURA.

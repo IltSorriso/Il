@@ -11,6 +11,7 @@ aponte.
 
 Uso:
   cli/nota "o texto da nota"        cria; imprime os dois enderecos
+  cli/nota "..." --licenca reservado   a licenca da anotacao (padrao: CC0)
   cli/nota --apagar <endereco>      remove UMA anotacao (e o texto dela, se orfao)
   cli/nota --listar                 lista as anotacoes do canone
 """
@@ -38,14 +39,14 @@ def apontado_por(objs, alvo):
     """quem cita esse endereco — em QUALQUER campo"""
     return [n for n, (b, _) in objs.items() if n != alvo and alvo.encode() in b]
 
-def criar(texto, titulo=None):
+def criar(texto, licenca=LIC):
     objs = objetos()
     tb = texto.encode()
     th = endereco(tb)
     novo_t = th not in objs
     if novo_t:
         open(os.path.join(DEP, th), "wb").write(tb)
-    corpo = f"tipo: anotacao\nconteudo: {th}\nlicenca: {LIC}\n".encode()
+    corpo = f"tipo: anotacao\nconteudo: {th}\nlicenca: {licenca}\n".encode()
     ah = endereco(corpo)
     novo_a = ah not in objs
     if novo_a:
@@ -100,5 +101,10 @@ if __name__ == "__main__":
     if a[0] == "--listar":
         listar()
     else:
-        titulo = a[1] if len(a) > 1 and a[1].startswith("--titulo") else None
-        criar(a[0])
+        lic = LIC
+        resto = a[1:]
+        if "--licenca" in resto:
+            i = resto.index("--licenca")
+            if i + 1 < len(resto): lic = resto[i + 1]
+            else: print("--licenca exige um valor"); sys.exit(2)
+        criar(a[0], lic)

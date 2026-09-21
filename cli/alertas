@@ -13,8 +13,14 @@ contas de data. O modelo da' apelido; ele nao da' nivel.
 
 O nivel e' o MAIOR que qualquer sinal alcancar. Um objeto so' desce de nivel quando
 nao ha' sinal nenhum.
+
+RAMO FUNDIDO X RAMO ABANDONADO. Os dois nomeiam um ramo que nao existe. A diferenca
+e' MEDIDA, e nao escrita a mao: se o compromisso que ADICIONOU a declaracao e'
+ancestral da pindorama, o ramo foi fundido e a declaracao e' MEMORIA — nivel mais
+baixo, sem prazo e sem alarme. Se nao for, ela ficou presa num ramo que nunca se
+juntou, e isso e' divida de verdade, que continua gritando.
 """
-import datetime, os, subprocess, sys
+import datetime, os, re, subprocess, sys
 raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEP = os.path.join(raiz, "exemplos", "deposito", "objetos")
 QUEB = os.path.join(raiz, "exemplos", "quebrados", "objetos")
@@ -56,10 +62,50 @@ def data(s):
     try: return datetime.date.fromisoformat(s)
     except ValueError: return None
 
+def adicionado_em(f):
+    """o compromisso que ADICIONOU este objeto no repositorio"""
+    if not f: return None
+    try:
+        r = subprocess.run(["git", "-C", raiz, "log", "--all", "--format=%H",
+                            "--diff-filter=A", "--", os.path.relpath(f, raiz)],
+                           capture_output=True, text=True, timeout=30)
+        linhas = [x.strip() for x in r.stdout.splitlines() if x.strip()]
+        return linhas[-1] if linhas else None
+    except Exception:
+        return None
+
+def fundido(f):
+    """True quando o ramo que criou a declaracao ja' esta' DENTRO da pindorama"""
+    c = adicionado_em(f)
+    if not c: return False
+    try:
+        return subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", c, "pindorama"],
+                              capture_output=True, timeout=30).returncode == 0
+    except Exception:
+        return False
+
+def encerradas(objs, idx):
+    """As A5 com VEREDITO escrito — linha `encerramento: <endereco>` no texto da anotacao.
+    O git diz se o ramo foi fundido; so' o veredito diz se a PERGUNTA foi respondida."""
+    s = set()
+    for h, c in idx.items():
+        t = c.get("conteudo", "")
+        if len(t) != 64: continue
+        for hh, f, _ in objs:
+            if hh != t: continue
+            try: b = open(f, "rb").read()
+            except Exception: break
+            for m in re.finditer(rb"(?m)^encerramento:[ ]([0-9a-f]{64})[ ]*$", b):
+                s.add(m.group(1).decode())
+            break
+    return s
+
 def main():
     objs = list(todos())
     idx = {h: campos(f) for h, f, _ in objs}
     prov_de = {h: p for h, _, p in objs}
+    caminho_de = {h: f for h, f, _ in objs}
+    ENCERRADAS = encerradas(objs, idx)
     # quem e' alcancado, por qualquer campo de 64 hex
     apontados = set()
     for h, c in idx.items():
@@ -69,10 +115,18 @@ def main():
     alertas = []   # (nivel, rotulo, endereco, motivo)
 
     # ---- 3. CONFORMIDADE COM O ITINERARIO ----
-    declarados = {}
+    declarados, fundidas = {}, []
     for h, c in idx.items():
         if c.get("tipo") == "declaracao" and c.get("ramo"):
-            declarados.setdefault(c["ramo"], []).append((h, c.get("prazo", "")))
+            b = c["ramo"]
+            try:
+                vivo = subprocess.run(["git", "-C", raiz, "rev-parse", "--verify", b],
+                                      capture_output=True, timeout=20).returncode == 0
+            except Exception:
+                vivo = False
+            if not vivo and fundido(caminho_de.get(h)):
+                fundidas.append((h, b)); continue
+            declarados.setdefault(b, []).append((h, c.get("prazo", "")))
     for b in ramos():
         if b not in declarados:
             alertas.append((3, "RAMO SEM DECLARACAO", b,
@@ -92,6 +146,11 @@ def main():
                 for h, _ in lst: alertas.append((2, "DECLARACAO DE RAMO INEXISTENTE", h, b))
         except Exception: pass
 
+    FUNDIDAS = set(h for h, _ in fundidas)
+    for h, b in fundidas:
+        alertas.append((1, "RAMO FUNDIDO", h, b + (" — encerrada: ha' veredito no deposito"
+                       if h in ENCERRADAS else " — fundida, e sem veredito escrito")))
+
     # ---- 1 e 2. A BOLHA E OS METADADOS ----
     for h, c in idx.items():
         if not c: continue
@@ -101,7 +160,7 @@ def main():
                 alertas.append((3, "SEM TIPO E SEM ALCANCE", h, "artefato ate' prova em contrario"))
             continue
         p = c.get("prazo")
-        if p:
+        if p and h not in FUNDIDAS:
             d = data(p)
             if d is None:      alertas.append((3, "PRAZO MALFORMADO", h, p))
             elif (d - HOJE).days < 0: alertas.append((3, "PRAZO VENCIDO", h, "ha' %d dia(s)" % -(d - HOJE).days))
@@ -121,8 +180,9 @@ def main():
         print("  %s %-28s %-14s %s" % (marca[n], rot, alvo[:14], motivo))
     a = sum(1 for x in alertas if x[0] == 3)
     print()
-    print("  %d alerta(s) · %d em ALTO · %d em MEDIO · %d objeto(s) varrido(s) e %d ramo(s) fora da pindorama"
-          % (len(alertas), a, sum(1 for x in alertas if x[0] == 2), len(objs), len(ramos())))
+    print("  %d alerta(s) · %d em ALTO · %d em MEDIO · %d em memoria · %d objeto(s) varrido(s) e %d ramo(s) fora da pindorama"
+          % (len(alertas), a, sum(1 for x in alertas if x[0] == 2),
+             sum(1 for x in alertas if x[0] == 1), len(objs), len(ramos())))
     return 1 if a else 0
 
 sys.exit(main())
