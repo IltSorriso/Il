@@ -19,6 +19,11 @@ e' MEDIDA, e nao escrita a mao: se o compromisso que ADICIONOU a declaracao e'
 ancestral da pindorama, o ramo foi fundido e a declaracao e' MEMORIA — nivel mais
 baixo, sem prazo e sem alarme. Se nao for, ela ficou presa num ramo que nunca se
 juntou, e isso e' divida de verdade, que continua gritando.
+
+O INSUMO DE TESTE NAO E' COMPROMISSO. Objeto que mora em exemplos/quebrados/objetos
+nao entra na conta do itinerario: o `ramo` dele e' rotulo de teste, e nao precisa
+resolver. Mas a FORMA dele continua sendo dita — um prazo malformado num caso negativo
+e' o PONTO dele, e calar a boca sobre isso seria perder o unico sinal que ele da'.
 """
 import datetime, os, re, subprocess, sys
 raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -139,7 +144,7 @@ def main():
     # ---- 3. CONFORMIDADE COM O ITINERARIO ----
     declarados, fundidas = {}, []
     for h, c in idx.items():
-        if c.get("tipo") == "declaracao" and c.get("ramo"):
+        if c.get("tipo") == "declaracao" and c.get("ramo") and prov_de.get(h) != "quebrado":
             b = c["ramo"]
             try:
                 vivo = subprocess.run(["git", "-C", raiz, "rev-parse", "--verify", b],
