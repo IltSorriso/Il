@@ -133,7 +133,13 @@ def main():
     print("  nivel vem de FATOS; o apelido vem do modelo quando o objeto nao tem nome")
     print()
     for niv, n, esp, h, porque in saida:
-        print("  %s %-26s %-11s %s  %s" % (marca[niv], n[:26], esp, h[:12], porque))
+        # O APELIDO CARREGA A SINTESE, e a coluna de 26 nao cabe nome +
+        # sintese (medido: "O Treze de Quarenta e Cinco" saiu como "O Treze de
+        # Quarenta e Cinc"). Entao a SINTESE vai na linha de baixo: cortada, ela
+        # sumiria em silencio.
+        nome, _, sint = n.partition(" — ")
+        print("  %s %-26s %-11s %s  %s" % (marca[niv], nome[:26], esp, h[:12], porque))
+        if sint: print("        %s" % sint)
     c3 = sum(1 for s in saida if s[0] == 3)
     print()
     print("  %d objeto(s) · %d em ALTO · %d em MEDIO · %d com nome proprio" % (
