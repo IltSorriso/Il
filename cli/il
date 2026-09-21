@@ -51,6 +51,7 @@ case "${1:-ajuda}" in
       *)         linhas "" ;;
     esac ;;
   nome)     IDX=$(indice); printf '%s\n' "$IDX" | grep "^$2|" || echo "nao existe janela com o nome '$2'" ;;
+  alertas)  exec "$(dirname "$0")/alertas" ;;
   nomes)    shift; exec "$(dirname "$0")/nomes" "$@" ;;
   guarda)   exec "$(dirname "$0")/guarda" ;;
   verificar) echo "camada 2 — verificar"; echo "  porta: nada sobe sem esta camada verde"; echo "  corrida inteira:  lean --run cadeia/Cadeia.lean --etapa tudo" ;;
@@ -64,7 +65,8 @@ case "${1:-ajuda}" in
     echo "  il criar <o que>                camada 3: a mao que escreve"
     echo "  il manter <o que>               camada 4: o que vence e apodrece"
     echo "  il nome <nome>                  o endereco da janela com esse nome"
-    echo "  il nomes [--gerar]              apelidos provisorios e alertas por prioridade"
+    echo "  il alertas                      o nivel por FATOS, bolha + metadados + itinerario"
+    echo "  il nomes [--gerar]              apelidos provisorios, por prioridade"
     echo "  il guarda                       recusa julgar com compilado velho"
     echo
     echo "  as camadas vem de bolhas de especie proposito no deposito" ;;

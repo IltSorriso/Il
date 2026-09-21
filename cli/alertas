@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""alertas — o nivel, calculado e nao opinado.
+
+O QUE ENTRA NA CONTA, e sao tres coisas, nao uma:
+  1. A BOLHA      — a forma dela, a especie, os campos que ela carrega
+  2. OS METADADOS — nome proprio? prazo? alcancada por alguem? de que ramo?
+  3. A CONFORMIDADE COM O ITINERARIO — as `declaracao` de A5 SAO o itinerario: elas
+     carregam `ramo`, `prazo` e `texto`. Um ramo com trabalho nao fundido e SEM
+     declaracao e' divida de processo, e o itinerario nao a registra.
+
+E' DETERMINISTICO. Nao ha modelo aqui: toda linha sai de comparacao de campos e de
+contas de data. O modelo da' apelido; ele nao da' nivel.
+
+O nivel e' o MAIOR que qualquer sinal alcancar. Um objeto so' desce de nivel quando
+nao ha' sinal nenhum.
+"""
+import datetime, os, subprocess, sys
+raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEP = os.path.join(raiz, "exemplos", "deposito", "objetos")
+QUEB = os.path.join(raiz, "exemplos", "quebrados", "objetos")
+HOJE = datetime.date.today()
+
+def campos(p):
+    d = {}
+    try:
+        for l in open(p, encoding="utf-8"):
+            if ": " in l[:200]:
+                k, v = l.split(": ", 1)
+                d.setdefault(k.strip(), v.strip())
+    except Exception: pass
+    return d
+
+def todos():
+    for pasta, prov in ((DEP, "canon"), (QUEB, "quebrado")):
+        if not os.path.isdir(pasta): continue
+        for h in sorted(os.listdir(pasta)):
+            f = os.path.join(pasta, h)
+            if os.path.isfile(f): yield h, f, prov
+
+def ramos():
+    """os ramos locais com trabalho NAO fundido na pindorama"""
+    try:
+        r = subprocess.run(["git", "-C", raiz, "branch", "--format=%(refname:short)"],
+                           capture_output=True, text=True, timeout=20)
+        todos_r = [b.strip() for b in r.stdout.splitlines() if b.strip()]
+        fora = []
+        for b in todos_r:
+            if b == "pindorama": continue
+            m = subprocess.run(["git", "-C", raiz, "merge-base", "--is-ancestor", b, "pindorama"],
+                               capture_output=True, timeout=20)
+            if m.returncode != 0: fora.append(b)
+        return fora
+    except Exception: return []
+
+def data(s):
+    try: return datetime.date.fromisoformat(s)
+    except ValueError: return None
+
+def main():
+    objs = list(todos())
+    idx = {h: campos(f) for h, f, _ in objs}
+    prov_de = {h: p for h, _, p in objs}
+    # quem e' alcancado, por qualquer campo de 64 hex
+    apontados = set()
+    for h, c in idx.items():
+        for v in c.values():
+            if len(v) == 64: apontados.add(v)
+
+    alertas = []   # (nivel, rotulo, endereco, motivo)
+
+    # ---- 3. CONFORMIDADE COM O ITINERARIO ----
+    declarados = {}
+    for h, c in idx.items():
+        if c.get("tipo") == "declaracao" and c.get("ramo"):
+            declarados.setdefault(c["ramo"], []).append((h, c.get("prazo", "")))
+    for b in ramos():
+        if b not in declarados:
+            alertas.append((3, "RAMO SEM DECLARACAO", b,
+                            "trabalho nao fundido e o itinerario nao o registra"))
+        else:
+            for h, p in declarados[b]:
+                d = data(p)
+                if d is None:
+                    alertas.append((3, "PRAZO MALFORMADO", h, "%s — ramo %s" % (p, b)))
+                elif (d - HOJE).days < 0:
+                    alertas.append((3, "PRAZO VENCIDO", h, "ha' %d dia(s) — ramo %s" % (-(d - HOJE).days, b)))
+    for b, lst in declarados.items():
+        try:
+            ex = subprocess.run(["git", "-C", raiz, "rev-parse", "--verify", b],
+                                capture_output=True, text=True, timeout=20)
+            if ex.returncode != 0:
+                for h, _ in lst: alertas.append((2, "DECLARACAO DE RAMO INEXISTENTE", h, b))
+        except Exception: pass
+
+    # ---- 1 e 2. A BOLHA E OS METADADOS ----
+    for h, c in idx.items():
+        if not c: continue
+        esp = c.get("tipo")
+        if esp is None:
+            if h not in apontados:
+                alertas.append((3, "SEM TIPO E SEM ALCANCE", h, "artefato ate' prova em contrario"))
+            continue
+        p = c.get("prazo")
+        if p:
+            d = data(p)
+            if d is None:      alertas.append((3, "PRAZO MALFORMADO", h, p))
+            elif (d - HOJE).days < 0: alertas.append((3, "PRAZO VENCIDO", h, "ha' %d dia(s)" % -(d - HOJE).days))
+            elif (d - HOJE).days <= 7: alertas.append((3, "PRAZO CURTO", h, "vence em %d dia(s)" % (d - HOJE).days))
+            elif (d - HOJE).days <= 30: alertas.append((2, "PRAZO PROXIMO", h, "vence em %d dias" % (d - HOJE).days))
+        if prov_de[h] == "quebrado" and c.get("tipo") not in ("declaracao",):
+            alertas.append((2, "CASO NEGATIVO", h, "e' insumo de teste, nao conteudo"))
+        if "nome" not in c and c.get("conteudo", "") == "":
+            alertas.append((2, "SEM NOME PROPRIO", h, "so' alcancavel pelo endereco"))
+
+    alertas.sort(key=lambda x: (-x[0], x[1], x[2]))
+    marca = {3: "[!!!]", 2: "[ ! ]", 1: "[   ]"}
+    print("ALERTAS — nivel por FATOS, nao por opiniao")
+    print("  entram na conta: a bolha · os metadados · a conformidade com o itinerario")
+    print()
+    for n, rot, alvo, motivo in alertas:
+        print("  %s %-28s %-14s %s" % (marca[n], rot, alvo[:14], motivo))
+    a = sum(1 for x in alertas if x[0] == 3)
+    print()
+    print("  %d alerta(s) · %d em ALTO · %d em MEDIO · %d objeto(s) varrido(s) e %d ramo(s) fora da pindorama"
+          % (len(alertas), a, sum(1 for x in alertas if x[0] == 2), len(objs), len(ramos())))
+    return 1 if a else 0
+
+sys.exit(main())
