@@ -1,0 +1,22 @@
+O INSUMO DE TESTE — nomeado.
+
+O OBJETO: 6ce0dfb40b37788725329ca070f59c4491451af182c0e321f5af9d12a605ffb0
+Mora em exemplos/quebrados/objetos. E' uma `declaracao` de prazo MALFORMADO
+(mes 13 e dia 45 nao existem). O texto dela e' a9aaaedb31c77ced1588a1b5dd3d0102827e37c31d66139da0dcf6a8e6b58197 — e esse texto mora no CANONE, de proposito.
+
+POR QUE O TEXTO MORA NO CANONE. Para a recusa vir DA REGRA DO PRAZO e de mais
+nada. Se o texto apontado nao estivesse no deposito, o juiz recusaria por "texto
+ausente" — pelo motivo ERRADO — e o caso negativo deixaria de provar o que
+existe para provar.
+
+O QUE ELE PROVA. juiz/Bolha.lean:385 prazoOk, :408 prazoOkB, o teorema
+prazoOk_iff em :403, e o veredito em juiz/Ponte.lean:59. Tudo o mais nele e'
+valido de proposito: o endereco confere, o objeto do texto esta no deposito, a
+licenca e' reservado.
+
+QUEM O ALCANCA. O juiz, pela TERCEIRA CLASSE: alcancado SO' por quebrado e' dito
+em voz alta como INSUMO DE TESTE NEGATIVO, e NAO derruba a corrida. Alcancado
+por ninguem seria ARTEFATO — e ai derruba.
+
+SEM ESTE NOME. O objeto pareceria sobra. Ele e' o UNICO teste da regra do prazo;
+apaga-lo faz o teorema perder o unico caso que o exercita.
