@@ -65,6 +65,7 @@ textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px
     <button id="t-painel" aria-selected="true">painel</button>
     <button id="t-conversa" aria-selected="false">conversa</button>
     <button id="t-compor" aria-selected="false">compor</button>
+  <button id="t-quadros" aria-selected="false">quadros</button>
   </div>
 </header>
 <main>
@@ -84,6 +85,12 @@ textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px
     </div>
     <p class="dica" id="modo"></p>
   </section>
+  <section id="s-quadros">
+    <p class="dica">os quatro quadros sao SAIDA: calculados na hora a partir do deposito
+    (e, no caso do tempo, do proprio git). Nada aqui e' guardado — por isso nada aqui apodrece.</p>
+    <div id="q-corpo"><p class="dica">abra este separador para calcular.</p></div>
+  </section>
+
   <section id="s-compor">
     <p class="dica">a forma de cada espécie é lida do próprio dado. escolha a espécie e os campos aparecem.</p>
     <label for="esp">espécie</label>
@@ -99,12 +106,13 @@ let modo = "estatico", vivo = false;
 try { modo = (location.protocol==="file:") ? "estatico" : "servidor"; } catch(e){}
 
 function abrir(qual){
-  ["painel","conversa","compor"].forEach(x=>{
+  ["painel","conversa","compor","quadros"].forEach(x=>{
     document.getElementById("s-"+x).classList.toggle("on", x===qual);
     document.getElementById("t-"+x).setAttribute("aria-selected", String(x===qual));
   });
+  if(qual==="quadros") desenharQuadros();
 }
-["painel","conversa","compor"].forEach(x=>{
+["painel","conversa","compor","quadros"].forEach(x=>{
   document.getElementById("t-"+x).onclick = ()=>abrir(x);
 });
 
@@ -125,7 +133,7 @@ function render(d){
   document.getElementById("t-especie").innerHTML = h;
 
   let p = "<tr><th>ramo</th><th>prazo</th><th>resta</th></tr>";
-  const ds = d.declaracoes||[];
+  const ds = Array.isArray(d.declaracoes)?d.declaracoes:[];
   if(!ds.length) p += '<tr><td colspan="3" class="m">nenhuma declaração no acervo lido</td></tr>';
   ds.forEach(x=>{
     let c="", t="sem prazo";
@@ -138,7 +146,7 @@ function render(d){
   document.getElementById("t-prazo").innerHTML = p;
 
   let c = "<tr><th>nome</th><th>padrão</th><th>sigilo</th></tr>";
-  const cs = d.caminhos||[];
+  const cs = Array.isArray(d.caminhos)?d.caminhos:[];
   if(!cs.length) c += '<tr><td colspan="3" class="m">o acervo não declara caminho neste depósito</td></tr>';
   cs.forEach(x=>{
     c += `<tr><td>${esc(x.nome)}</td><td class="m">${esc(x.padrao)}</td><td>${x.sigilo?`<span class="tag">${esc(x.sigilo)}</span>`:'<span class="m">campo não existe</span>'}</td></tr>`;
@@ -162,6 +170,92 @@ function render(d){
   const pil = document.getElementById("pil");
   pil.textContent = (vivo?"● ao vivo":(modo==="servidor"?"○ sondando":"○ estático"))+" · "+d.assinatura;
   pil.className = "pil"+(vivo?" viva":(modo==="servidor"?"":" morta"));
+}
+
+// ---- os quatro quadros: tempo, peso, forma, alcance ------------------------
+// SAO SAIDA, nao estado. Calculados na hora, nada guardado para apodrecer.
+let QD = null;
+function barra(v, max, cor){
+  const w = max > 0 ? Math.max(2, Math.round(100*v/max)) : 0;
+  return '<div style="background:'+cor+';height:8px;border-radius:4px;width:'+w+'%"></div>';
+}
+function desenharQuadros(forcar){
+  const alvo = document.getElementById("q-corpo");
+  if(!alvo) return;
+  if(QD && !forcar){ pintarQuadros(QD); return; }
+  alvo.innerHTML = '<p class="dica">calculando os quatro quadros…</p>';
+  fetch("api/painel", {cache:"no-store"}).then(r=>r.json()).then(d=>{
+    if(d.erro){ alvo.innerHTML = '<p class="av">'+esc(d.erro)+'</p>'; return; }
+    QD = d; pintarQuadros(d);
+  }).catch(e=>{ alvo.innerHTML = '<p class="av">nao consegui calcular: '+esc(e)+'</p>'; });
+}
+function pintarQuadros(d){
+  const f = d.forma||{}, p = d.peso||{}, a = d.alcance||{}, t = d.tempo||{};
+  let h = "";
+
+  h += '<h2>tempo — quando cada objeto entrou</h2>';
+  const L = t.linha||[], maxT = Math.max(1, ...L.map(l=>l.quantos));
+  h += '<table><tr><th>dia</th><th>obj</th><th></th><th>bytes</th><th>compromisso</th></tr>';
+  L.forEach(l=>{
+    h += '<tr><td class="m">'+esc(l.dia)+'</td><td>'+l.quantos+'</td>'
+       + '<td style="width:32%">'+barra(l.quantos,maxT,"var(--ac)")+'</td>'
+       + '<td class="m">'+l.bytes+'</td><td class="m">'+esc(l.compromisso)+'</td></tr>';
+  });
+  h += '</table>';
+  if(t.naturezas) h += '<p class="dica">tempo de guardar: '+esc(t.naturezas.de_guardar)
+                     + ' · tempo do mundo: '+esc(t.naturezas.do_mundo)+'</p>';
+  const sg = t.sem_registro_no_git||[];
+  if(sg.length) h += '<p class="dica">fora do git: '+sg.length+' — '
+                   + sg.slice(0,8).map(o=>esc(o.endereco.slice(0,12))+' ('+esc(o.tipo)+', '+esc(o.procedencia)+')').join(' · ')+'</p>';
+
+  h += '<h2>peso — bytes por espécie</h2>';
+  const P = p.por_especie||[], maxP = Math.max(1, ...P.map(x=>x.bytes));
+  h += '<table><tr><th>espécie</th><th>obj</th><th>bytes</th><th></th><th>média</th></tr>';
+  P.forEach(x=>{
+    h += '<tr><td>'+esc(x.especie)+'</td><td>'+x.objetos+'</td><td class="m">'+x.bytes+'</td>'
+       + '<td style="width:24%">'+barra(x.bytes,maxP,"var(--ro)")+'</td>'
+       + '<td class="m">'+x.media+'</td></tr>';
+  });
+  h += '</table>';
+  if(p.total) h += '<p class="dica">'+p.total.objetos+' objetos · '+p.total.bytes
+                 + ' bytes · média '+p.total.media+' B · acima do limiar de árvore ('
+                 + p.limiar_arvore+' B): '+p.acima_do_limiar+'</p>';
+  if(p.acima_do_limiar===0) h += '<p class="dica">nenhum objeto chega ao limiar — '
+                              + 'um resumo em árvore nunca engataria nestes dados.</p>';
+
+  h += '<h2>forma — o vocabulário, lido do próprio depósito</h2>';
+  h += '<table><tr><th>espécie</th><th>campos</th><th>conteúdo</th></tr>';
+  (f.especies||[]).forEach(e=>{
+    const cs = (e.campos||[]).map(c=>'<span class="tag">'+esc(c.nome)
+             + (c.aponta?' *':'') + (c.existe?'':' ✗')+'</span>').join(' ');
+    h += '<tr><td>'+esc(e.especie)+'</td><td>'+cs+'</td><td class="m">'
+       + esc(e.conteudo||"—")+'</td></tr>';
+  });
+  h += '</table>';
+  if(f.contagem) h += '<p class="dica">'+f.contagem.especies+' espécies · '+f.contagem.campos
+                   + ' campos · '+f.contagem.campos_usados+' usados · '
+                   + f.contagem.campos_orfaos+' órfão(s)</p>';
+  const nr = f.enderecos_que_nao_resolvem||[];
+  h += nr.length
+     ? '<p class="av">vocabulário quebrado: '+nr.length+' endereço(s) declarados que não resolvem</p>'
+     : '<p class="ok">todo endereço declarado em `campos` resolve — vocabulário íntegro</p>';
+
+  h += '<h2>alcance — quem aponta quem</h2>';
+  const fa = a.faixas||{};
+  h += '<table><tr><th>quantos apontam</th><th>objetos</th></tr>';
+  ['0','1','2-3','4+'].forEach(k=>{ h += '<tr><td class="m">'+k+'</td><td>'+(fa[k]||0)+'</td></tr>'; });
+  h += '</table>';
+  h += '<h2>os mais apontados</h2><table><tr><th>endereço</th><th>tipo</th><th>grau</th><th>por</th></tr>';
+  (a.mais_apontados||[]).forEach(x=>{
+    h += '<tr><td class="m">'+esc(x.endereco.slice(0,12))+'…</td><td>'+esc(x.tipo)
+       + '</td><td>'+x.grau+'</td><td class="m">'+esc((x.por||[]).join(", "))+'</td></tr>';
+  });
+  h += '</table>';
+  if(a.sem_alcance && a.sem_alcance.quantos) h += '<p class="dica">sem tipo e sem alcance: '
+                                               + a.sem_alcance.quantos+' — artefato até prova em contrário</p>';
+  if(a.como_ler) h += '<p class="dica">'+esc(a.como_ler)+'</p>';
+
+  document.getElementById("q-corpo").innerHTML = h;
 }
 
 function avisar(d){
@@ -258,3 +352,6 @@ document.getElementById("bnotif").onclick = async ()=>{
 render(DADOS);
 conectar();
 perguntar("ajuda");
+</script>
+</body>
+</html>
