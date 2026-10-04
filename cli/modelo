@@ -27,7 +27,9 @@ if not k:
     sys.stderr.write("sem chave: ponha-a em $IL_RAIZ/.chaves/deepseek, ou em $IL_CHAVE_DEEPSEEK\n")
     sys.exit(3)
 
-texto = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else sys.stdin.read()
+com_json = "--json" in sys.argv[1:]
+argumentos = [a for a in sys.argv[1:] if a != "--json"]
+texto = " ".join(argumentos) if argumentos else sys.stdin.read()
 modelo = os.environ.get("IL_MODELO", "deepseek-chat")
 corpo = json.dumps({"model": modelo,
                     "messages": [{"role": "user", "content": texto}],
@@ -38,7 +40,21 @@ try:
     with urllib.request.urlopen(req, timeout=60) as r:
         d = json.load(r)
 except Exception as e:
-    sys.stderr.write("a chamada falhou: %s\n" % e); sys.exit(4)
+    sys.stderr.write("a chamada falhou: %s\n" % e)
+    if com_json:
+        print(json.dumps({"erro": str(e)}))
+    sys.exit(4)
+
 u = d.get("usage", {})
-sys.stderr.write("[modelo: %s · %s unidades de texto]\n" % (d.get("model","?"), u.get("total_tokens","?")))
-print(d["choices"][0]["message"]["content"].strip())
+# QUAL MODELO RESPONDEU. O servidor devolve o nome REAL, que pode nao ser o
+# apelido enviado — ja' foi medido: pedi `deepseek-chat` e voltou `deepseek-flash`.
+# Sem isto o selo diria apenas "modelo", e nao QUAL — e a politica de um nao e' a
+# do outro. O nome que vale e' o que VOLTOU, nao o que foi pedido.
+respondido = d.get("model") or modelo
+saida = d["choices"][0]["message"]["content"].strip()
+if com_json:
+    print(json.dumps({"modelo": respondido, "pedido": modelo,
+                      "saida": saida, "unidades": u.get("total_tokens")}))
+else:
+    sys.stderr.write("[modelo: %s · %s unidades de texto]\n" % (respondido, u.get("total_tokens", "?")))
+    print(saida)

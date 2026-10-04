@@ -453,25 +453,59 @@ def apontar(raiz, alvo):
             "nota": "anotacao apontando — nasceu PRIVADA"}
 
 
-def licencaDoModelo(raiz):
-    """O ENDERECO da licenca-selo, se ela estiver no acervo.
+NOME_DA_GENERICA = "saida-generativa"
 
-    Nao se inventa endereco: ele e' LIDO do deposito, procurando a licenca cujo
-    `catalogo` e' `modelo`. Se nao existir, devolve None e quem chama NAO grava
-    o selo — melhor nao marcar do que marcar errado.
+
+def licencasDeModelo(raiz):
+    """TODAS as licencas-modelo do acervo, como (nome, endereco).
+
+    O endereco NUNCA e' inventado: e' lido do deposito. Isto e' o que torna
+    possivel haver mais de uma — uma por modelo — sem que o codigo saiba de
+    antemao quais existem.
     """
+    achadas = []
     for origem in ("exemplos/deposito/objetos", "deposito/objetos"):
         d = os.path.join(raiz, origem)
         if not os.path.isdir(d):
             continue
-        for h in os.listdir(d):
+        for h in sorted(os.listdir(d)):
             try:
                 with open(os.path.join(d, h), "rb") as f:
                     t = f.read().decode("utf-8", "replace")
             except OSError:
                 continue
             if t.startswith("tipo: licenca") and "\ncatalogo: modelo\n" in t:
+                nome = ""
+                for linha in t.splitlines():
+                    if linha.startswith("nome: "):
+                        nome = linha[6:].strip()
+                achadas.append((nome, h))
+    return achadas
+
+
+def licencaDoModelo(raiz, modelo=None):
+    """O ENDERECO da licenca-selo. QUAL delas depende de sabermos QUEM respondeu.
+
+    A ordem, e cada passo e' dito:
+      1. a licenca cujo `nome` E' o modelo que respondeu — a ESPECIFICA
+      2. a generica (`saida-generativa`)                 — quando nao se sabe quem
+      3. nenhuma                                         — quem chama NAO grava selo
+
+    O MODELO QUE VALE E' O QUE VOLTOU, nao o apelido que foi pedido. Medido em
+    04/10/2026: pedindo `deepseek-chat`, quem respondeu foi `deepseek-flash`. Se o
+    selo gravasse o pedido, diria um nome FALSO — e a politica de um modelo nao e'
+    a do outro, entao um selo falso e' pior que selo nenhum.
+    """
+    achadas = licencasDeModelo(raiz)
+    if modelo:
+        for nome, h in achadas:
+            if nome == modelo:
                 return h
+    for nome, h in achadas:
+        if nome == NOME_DA_GENERICA:
+            return h
+    if len(achadas) == 1:
+        return achadas[0][1]
     return None
 
 
@@ -892,7 +926,8 @@ def conversar(raiz, pergunta, modo="acervo", janela=None):
         if j and j["convencao"]:
             com = ("Convencao desta meta-janela (%s):\n%s\n\nPergunta: %s"
                    % (j["nome"], j["convencao"], pergunta))
-        r = _sp.run(["python3", script, com], capture_output=True, text=True, timeout=90)
+        r = _sp.run(["python3", script, "--json", com],
+                     capture_output=True, text=True, timeout=90)
     except _sp.TimeoutExpired:
         return {"modo": "modelo", "saiu_da_maquina": True, "resposta": "o modelo nao respondeu em 90 s."}
     except OSError as erro:
@@ -900,8 +935,18 @@ def conversar(raiz, pergunta, modo="acervo", janela=None):
     if r.returncode != 0:
         return {"modo": "modelo", "saiu_da_maquina": True,
                 "resposta": "o modelo recusou (codigo %d):\n%s" % (r.returncode, (r.stderr or "")[:400])}
+    # O MODELO QUE RESPONDEU, lido do JSON — e' ELE que vai no selo, nao o apelido
+    # pedido. Medido em 04/10/2026: pedindo `deepseek-chat`, respondeu `deepseek-flash`.
+    resposta, respondeu = "", ""
+    try:
+        dj = json.loads((r.stdout or "").strip() or "{}")
+        resposta = (dj.get("saida") or "").strip()
+        respondeu = (dj.get("modelo") or "").strip()
+    except ValueError:
+        resposta = (r.stdout or "").strip()
     return {"modo": "modelo", "saiu_da_maquina": True, "janela": j,
-            "resposta": (r.stdout or "").strip(),
+            "modelo": respondeu,
+            "resposta": resposta,
             "aviso": "isto NAO e' o acervo: e' um modelo de fora. Nada aqui foi conferido pelo juiz."}
 
 
@@ -1202,7 +1247,7 @@ class Mao(BaseHTTPRequestHandler):
             b = self.corpo()
             lic = (b.get("licenca") or "").strip()
             if (b.get("selo_de_modelo") or "").strip():
-                lic = licencaDoModelo(alvo) or ""
+                lic = licencaDoModelo(alvo, (b.get("modelo") or "").strip() or None) or ""
             return self.responder(registrar(alvo, b.get("texto") or "",
                                             (b.get("papel") or "pergunta").strip(), lic))
         if resto and resto[0] == "chat":

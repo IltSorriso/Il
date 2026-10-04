@@ -81,6 +81,11 @@ audio{width:100%;margin:5px 0;height:36px}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin:4px 0}
 .chips button{font-size:.78em;padding:2px 8px;background:#132a1e}
 .marcada{outline:1px solid #2c5c40}
+.seletor{position:relative}
+.achados{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.achados button{font-size:12px;padding:5px 9px;border-radius:20px}
+.escolhido{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--ok);margin-top:4px;word-break:break-all}
+
 </style>
 </head>
 <body>
@@ -387,9 +392,16 @@ async function chamar(rota, corpo){
   }catch(e){ return {erro: String(e.message||e)}; }
 }
 
-async function registrarTexto(texto, papel){
-  const d = await chamar("api/registrar", {texto, papel});
-  if(d && d.conteudo) return {ok:true, endereco:d.conteudo, carimbo:d.carimbo};
+async function registrarTexto(texto, papel, modelo){
+  // O SELO VIAJA NO DADO, nao no aviso da tela. Se esta resposta veio de um
+  // modelo generativo, o objeto gravado carrega a licenca DAQUELE modelo — e
+  // o nome que vale e o que VOLTOU, nao o apelido que foi pedido. Um aviso
+  // escrito na tela morre quando a aba fecha; o selo no dado fica.
+  const corpo = {texto, papel};
+  if(modelo){ corpo.modelo = modelo; corpo.selo_de_modelo = "1"; }
+  const d = await chamar("api/registrar", corpo);
+  if(d && d.conteudo) return {ok:true, endereco:d.conteudo, carimbo:d.carimbo,
+                                licenca:d.licenca, selo:d.selo_de_modelo};
   return {erro:(d && d.erro) || "o servidor nao respondeu"};
 }
 
@@ -477,10 +489,10 @@ async function perguntar(q){
   const resp = juntar("msg sis pre", r);
   botoes(resp, [
     {rotulo:"guardar nas anotações", dica:"esta resposta vira um objeto do acervo",
-     feito:"guardado", fazer:()=>registrarTexto(r, "resposta")},
+     feito:"guardado", fazer:()=>registrarTexto(r, "resposta", dd && dd.modelo)},
     {rotulo:"marcar", dica:"salva a resposta como objeto E a seleciona",
      feito:"marcada",
-     fazer:async ()=>{ const g = await registrarTexto(r, "resposta");
+     fazer:async ()=>{ const g = await registrarTexto(r, "resposta", dd && dd.modelo);
        if(!g.ok) return g;
        MENSAGENS.push({endereco:g.endereco, texto:r});
        alternar(g.endereco, resp); return {ok:true, endereco:g.endereco}; }},
@@ -574,21 +586,108 @@ async function desenharAnotacoes(){
   }catch(err){ alvo.innerHTML='<div class="av">não consegui ler: '+esc(err.message)+'</div>'; }
 }
 
-function camposDe(){
-  const esp = (DADOS.especies||{})[document.getElementById("esp").value];
-  const rel = (DADOS.relacoes||{});
-  if(!esp){ document.getElementById("campos").innerHTML=""; return; }
-  document.getElementById("campos").innerHTML = esp.campos.map(c=>
-    `<label for="c_${esc(c)}">${esc(c)} <span style="text-transform:none">· ${esc(rel[c]||"?")}</span></label>`
-    + `<input type="text" id="c_${esc(c)}" data-campo="${esc(c)}" placeholder="${c==="licenca"?"vazio = reservado":""}">`
-  ).join("");
-  document.getElementById("prev").innerHTML = "";
+function rotuloDaRelacao(c){
+  if(c.carrega_conteudo) return "carrega o CONTEÚDO — o endereço de um objeto";
+  if(c.relacao==="licenca") return "licença — vazio vira reservado";
+  if(c.aponta) return "carrega o endereço de outro objeto («"+c.relacao+"»)";
+  return "valor literal";
+}
+
+let _buscaT = null;
+
+// O SELETOR. O servidor diz `aponta: true` no campo que carrega um ENDEREÇO.
+// Onde ele diz isso, a tela põe BUSCA — nunca texto livre, porque endereço de
+// 64 caracteres não se digita, e um dígito trocado faz um objeto que não existe.
+// A busca lê do próprio acervo: nada sai da máquina.
+async function buscarPara(campo){
+  const id = campo.dataset.para;
+  const caixa = document.querySelector('.achados[data-de="'+id+'"]');
+  if(!caixa) return;
+  const termo = campo.value.trim();
+  if(_buscaT) clearTimeout(_buscaT);
+  _buscaT = setTimeout(async ()=>{
+    if(modo!=="servidor"){ caixa.innerHTML='<span class="dica">a busca precisa do servidor.</span>'; return; }
+    try{
+      const r = await fetch("api/sugerir",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({parcial:termo, enderecos:[]})});
+      const j = await r.json(); const d = j.dados || j;
+      const ac = d.acervo || [];
+      if(!ac.length){ caixa.innerHTML = '<span class="dica">nada no acervo com «'+esc(termo)+'»</span>'; return; }
+      caixa.innerHTML = ac.slice(0,8).map(e =>
+        '<button type="button" class="bp" data-endo="'+esc(e.endereco)+'" data-para="'+esc(id)+'">'
+        + esc(e.nome) + ' <span style="opacity:.6">'+esc(e.especie)+'</span></button>').join("")
+        + '<div class="dica">tudo isto veio do próprio acervo — nada saiu da máquina</div>';
+      caixa.querySelectorAll("button").forEach(b=>{
+        b.onclick = ()=>{
+          const oculto = document.getElementById(b.dataset.para);
+          if(oculto) oculto.value = b.dataset.endo;
+          const mostra = document.querySelector('.escolhido[data-mostra="'+b.dataset.para+'"]');
+          if(mostra) mostra.textContent = b.dataset.endo.slice(0,16)+"… — "+b.textContent.trim();
+          caixa.innerHTML = ""; campo.value = "";
+        };
+      });
+    }catch(err){ caixa.innerHTML = '<span class="dica">não consegui buscar: '+esc(err.message)+'</span>'; }
+  }, 180);
+}
+
+// A CASCATA. Escolhe a espécie -> a FORMA vem do depósito, lida AGORA.
+// Campo que carrega endereço vira seletor; campo literal vira texto; a licença
+// já vem do contexto, e vazio significa reservado.
+async function camposDe(){
+  const chave = document.getElementById("esp").value;
+  const alvo = document.getElementById("campos");
+  const dica = document.getElementById("esp-dica");
+  const prev = document.getElementById("prev");
+  if(prev) prev.innerHTML = "";
+  if(!chave){ alvo.innerHTML = ""; if(dica) dica.textContent = ""; return; }
+
+  let esp = null, fonte = "retrato embutido (congelado)";
+  if(modo==="servidor"){
+    try{
+      const r = await fetch("api/formulario");
+      const j = await r.json(); const d = j.dados || j;
+      if(d && d.especies && d.especies[chave]){ esp = d.especies[chave]; fonte = "depósito, lido agora"; }
+    }catch(e){}
+  }
+  if(!esp && DADOS.especies && DADOS.especies[chave]) esp = DADOS.especies[chave];
+  if(!esp){ alvo.innerHTML = ""; return; }
+
+  const det = esp.campos_detalhe || (esp.campos||[]).map(c=>({nome:c,relacao:"nenhuma",aponta:false,carrega_conteudo:false}));
+
+  if(dica){
+    const partes = ["<b>"+esc(chave)+"</b>: "+det.length+" campo"+(det.length===1?"":"s")];
+    if(esp.conteudo && esp.conteudo!=="nenhum") partes.push("carrega o conteúdo em «"+esc(esp.conteudo)+"»");
+    if(esp.licenca_exigida) partes.push("licença exigida: <b>"+esc(esp.licenca_exigida)+"</b>");
+    const apontam = det.filter(c=>c.aponta).length;
+    if(apontam) partes.push(apontam+(apontam===1?" campo aponta":" campos apontam")+" para outro objeto — seletor, não texto");
+    dica.innerHTML = partes.join(" · ") + ' <span style="opacity:.6">('+esc(fonte)+')</span>';
+  }
+
+  alvo.innerHTML = det.map(c=>{
+    const id = "c_"+c.nome;
+    let h = '<label for="'+esc(id)+'">'+esc(c.nome)+' <span style="text-transform:none">· '+esc(rotuloDaRelacao(c))+'</span></label>';
+    if(c.aponta){
+      const padrao = (c.nome==="licenca" && esp.licenca) ? esp.licenca : "";
+      h += '<div class="seletor">'
+         + '<input type="hidden" id="'+esc(id)+'" data-campo="'+esc(c.nome)+'" data-aponta="1" value="'+esc(padrao)+'">'
+         + '<input type="text" class="busca" data-para="'+esc(id)+'" autocomplete="off" placeholder="'
+         + (c.nome==="licenca" ? "vazio = reservado — ou busque uma licença" : "digite parte do nome para buscar no acervo…") + '">'
+         + '<div class="achados" data-de="'+esc(id)+'"></div>'
+         + '<div class="escolhido" data-mostra="'+esc(id)+'">'+(padrao ? esc(padrao.slice(0,16))+"…" : "")+'</div>'
+         + '</div>';
+    }else{
+      h += '<input type="text" id="'+esc(id)+'" data-campo="'+esc(c.nome)+'" placeholder="'+(c.nome==="licenca"?"vazio = reservado":"")+'">';
+    }
+    return h;
+  }).join("");
+
+  alvo.querySelectorAll("input.busca").forEach(b=>{ b.oninput = ()=> buscarPara(b); });
 }
 
 async function compor(){
   const esp = document.getElementById("esp").value;
   const valores = {};
-  document.querySelectorAll("#campos input").forEach(i=>{ valores[i.dataset.campo] = i.value; });
+  document.querySelectorAll("#campos input[data-campo]").forEach(i=>{ valores[i.dataset.campo] = i.value; });
   if(modo!=="servidor"){
     document.getElementById("prev").innerHTML = '<div class="av">compor precisa do servidor (o endereço é o sha256 dos bytes, calculado lá).</div>';
     return;
