@@ -59,6 +59,28 @@ audio{width:100%;margin:5px 0;height:34px}
 .obj{border-left:3px solid #2c5c40;padding:5px 9px;margin:5px 0;background:#0e1512;font-size:.9em}
 .obj.midia{border-color:#8a6d1b}
 .obj.orfa{border-color:#8b1b1b}
+.mic{background:#1d3b2a;border-color:#2c5c40}
+.mic.on{background:#8b1b1b;border-color:#8b1b1b}
+.mic.grande{font-size:1.05em;padding:14px 22px;width:100%}
+audio{width:100%;margin:5px 0;height:36px}
+#rec-topo{margin:10px 0}
+.obj{border-left:3px solid #2c5c40;padding:6px 10px;margin:6px 0;background:#0e1512;font-size:.9em}
+.obj.midia{border-color:#8a6d1b}
+.obj.orfa{border-color:#8b1b1b}
+.obj .rot{color:#8fa;margin-bottom:3px}
+#sessao{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0;
+  padding:7px 9px;background:#0e1512;border:1px solid #1d3b2a;border-radius:6px}
+#sessao select{flex:1;min-width:150px}
+#sessao .rot{color:#8fa;font-size:.85em}
+.acoes{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.acoes button{font-size:.8em;padding:3px 9px}
+.ligado{color:#8fa}
+#cesta{margin-top:10px;padding:8px 10px;background:#0e1512;border:1px solid #1d3b2a;border-radius:6px}
+#cesta .linha{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#cesta input{width:100%;margin:6px 0}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin:4px 0}
+.chips button{font-size:.78em;padding:2px 8px;background:#132a1e}
+.marcada{outline:1px solid #2c5c40}
 </style>
 </head>
 <body>
@@ -69,25 +91,40 @@ audio{width:100%;margin:5px 0;height:34px}
     <button class="bg" id="bnotif" style="padding:6px 10px;font-size:12px">🔔 notificações</button>
   </div>
   <div class="tabs">
-    <button id="t-conversa" aria-selected="true">conversa</button>
+    <button id="t-conversas" aria-selected="false">conversas</button>
     <button id="t-paineis" aria-selected="false">painéis</button>
     <button id="t-acervo" aria-selected="false">acervo</button>
-    <button id="t-compor" aria-selected="false">compor</button>
+    <button id="t-acrescentar" aria-selected="false">acrescentar</button>
+    <button id="t-anotacoes" aria-selected="true">anotações</button>
   </div>
 </header>
 <main>
-  <section id="s-conversa" class="on">
+  <section id="s-conversas">
     <div id="fala"><div class="msg sis">conversa com o acervo. eu respondo LENDO o depósito — e quando não sei, digo que não sei.
 
-o microfone grava uma nota de voz: ela vira um objeto do acervo (privado) e aparece aqui para ouvir.</div></div>
-    <div id="barra">
-      <input id="q" type="text" placeholder="pergunte ao acervo — ex: prazos / quantos / ajuda" autocomplete="off">
-      <button class="bp" id="enviar">enviar</button>
-      <button class="bp mic" id="bt-gravar" title="gravar nota de voz">🎤</button>
+cada pergunta vira um objeto no acervo: a conversa fica gravada, e não se perde quando você fecha a aba.</div></div>
+    <div id="sessao">
+      <span class="rot">sessão</span>
+      <select id="modo-sel">
+        <option value="acervo">acervo — responde fato, nada sai da máquina</option>
+        <option value="modelo">modelo — manda a pergunta para fora</option>
+      </select>
+      <select id="janela"><option value="">— meta-janela: nenhuma —</option></select>
+      <span id="sessao-estado" class="dica">lendo…</span>
     </div>
-    <p class="dica" id="rec-estado"></p>
-    <button class="bp" id="acima">⟳ sincronizar o acervo agora</button>
+    <div id="barra">
+      <input id="q" type="text" placeholder="pergunte — ex: prazos / quantos / ajuda" autocomplete="off">
+      <button class="bp" id="enviar">enviar</button>
+    </div>
     <p class="dica" id="modo"></p>
+    <div id="cesta">
+      <div class="linha"><b id="cesta-n">0 selecionadas</b>
+        <button class="bp" id="limpar">limpar</button></div>
+      <input id="nome-lista" type="text" placeholder="nome da lista — pode ficar EM BRANCO, para organizar depois" autocomplete="off">
+      <div id="sug" class="chips"></div>
+      <button class="bp" id="salvar-lista">guardar as selecionadas numa lista</button>
+      <p class="dica" id="cesta-estado">selecione mensagens pelo botão “marcar”.</p>
+    </div>
   </section>
 
   <section id="s-paineis">
@@ -99,21 +136,35 @@ o microfone grava uma nota de voz: ela vira um objeto do acervo (privado) e apar
     <h2>depósitos que o acervo declara a si mesmo</h2><table id="t-caminho"></table>
     <h2>itinerário</h2><div id="itinerario"></div>
     <h2>os quatro quadros</h2>
-    <div id="q-corpo"><p class="dica">abra este separador para calcular.</p></div>
+    <div id="q-corpo"><p class="dica">calculando…</p></div>
   </section>
 
   <section id="s-acervo">
-    <button class="bp" id="bt-acervo">⟳ ler o acervo</button>
-    <div id="acervo-corpo"><p class="dica">toque em "ler o acervo" — espécies, objetos,
-    mídias, e o que ninguém alcança.</p></div>
+    <div id="acervo-corpo"><p class="dica">lendo o acervo…</p></div>
   </section>
 
-  <section id="s-compor">
-    <p class="dica">a forma de cada espécie é lida do próprio dado. escolha a espécie e os campos aparecem.</p>
-    <label for="esp">espécie</label>
+  <section id="s-acrescentar">
+    <p class="dica">acrescentar um objeto ao acervo. <b>acrescentar</b>, e não editar: o
+    endereço de um objeto é o resumo do conteúdo dele, então nada aqui reescreve o que já
+    existe — só soma. escolha a espécie e os campos aparecem na ordem que ELES mandam,
+    lida do próprio depósito.</p>
+    <label for="esp">o que você quer acrescentar?</label>
     <select id="esp"></select>
+    <p class="dica" id="esp-dica"></p>
     <div id="campos"></div>
     <div id="prev"></div>
+  </section>
+
+  <section id="s-anotacoes" class="on">
+    <p class="dica">nota de voz. ela vira <b>conteúdo</b> no acervo, e a anotação que aponta
+    para ela nasce <b>privada</b> — vai para o acervo do ateliê, nunca para o cânone.
+    promover ao cânone continua sendo ato separado e deliberado.</p>
+    <div id="rec-topo">
+      <button class="bp mic grande" id="bt-gravar">● gravar</button>
+      <span id="rec-estado" class="dica">toque para gravar.</span>
+    </div>
+    <h2>as suas anotações</h2>
+    <div id="rec-lista"><p class="dica">abrindo…</p></div>
   </section>
 
 </main>
@@ -123,17 +174,20 @@ const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":
 let modo = "estatico", vivo = false;
 try { modo = (location.protocol==="file:") ? "estatico" : "servidor"; } catch(e){}
 
-const ABAS = ["conversa","paineis","acervo","compor"];
+const ABAS = ["conversas","paineis","acervo","acrescentar","anotacoes"];
 function abrir(qual){
   ABAS.forEach(x=>{
     const sec=document.getElementById("s-"+x), bt=document.getElementById("t-"+x);
     if(sec) sec.classList.toggle("on", x===qual);
     if(bt) bt.setAttribute("aria-selected", String(x===qual));
   });
-  if(qual==="paineis") desenharQuadros();
+  if(qual==="paineis"){ atualizarEstado(); desenharQuadros(); }
   if(qual==="acervo") desenharAcervo();
+  if(qual==="anotacoes") desenharAnotacoes();
+  if(qual==="acrescentar") camposDe();
 }
 ABAS.forEach(x=>{ const bt=document.getElementById("t-"+x); if(bt) bt.onclick=()=>abrir(x); });
+atualizarEstado();
 
 function render(d){
   DADOS = d;
@@ -319,25 +373,147 @@ function juntar(classe, conteudo){
   return d;
 }
 
-async function perguntar(q){
-  juntar("msg eu", q);
-  let r;
-  if(modo!=="servidor"){
-    r = "modo estático: a conversa precisa do servidor.\n\nrode:\n  python3 servidor/servidor.py\n\ne abra http://127.0.0.1:8791/";
-  } else {
-    try{
-      const resp = await fetch("api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q})});
-      const d = await resp.json();
-      r = d.resposta;
-      if(d.modo==="modelo") r = "[modelo de fora — nada aqui passou pelo juiz]\n\n" + r;
-    }catch(e){ r="não consegui falar com o servidor: "+e; }
+let JANELA = "";
+async function chamar(rota, corpo){
+  try{
+    const r = await fetch(rota, {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(corpo)});
+    return await r.json();
+  }catch(e){ return {erro: String(e.message||e)}; }
+}
+
+async function registrarTexto(texto, papel){
+  const d = await chamar("api/registrar", {texto, papel});
+  if(d && d.conteudo) return {ok:true, endereco:d.conteudo, carimbo:d.carimbo};
+  return {erro:(d && d.erro) || "o servidor nao respondeu"};
+}
+
+async function anotarObjeto(objeto){
+  const d = await chamar("api/apontar", {objeto});
+  if(d && d.anotacao) return {ok:true, endereco:d.anotacao};
+  return {erro:(d && d.erro) || "o servidor nao respondeu"};
+}
+
+function botoes(el, itens){
+  const barra = document.createElement("div");
+  barra.className = "acoes";
+  for(const it of itens){
+    const b = document.createElement("button");
+    b.className = "bp"; b.textContent = it.rotulo; b.title = it.dica || "";
+    b.onclick = async () => {
+      if(b.disabled) return;
+      b.disabled = true;
+      const antes = b.textContent;
+      b.textContent = "…";
+      const r = await it.fazer();
+      if(r && r.ok){ b.textContent = "✓ " + (it.feito || "feito"); b.title = r.endereco || ""; }
+      else { b.textContent = antes; b.disabled = false; b.title = (r && r.erro) || "falhou"; }
+    };
+    barra.appendChild(b);
   }
-  juntar("msg sis pre", r);
+  el.appendChild(barra);
+  return barra;
+}
+
+let SELECAO = new Set();
+let MENSAGENS = [];   // {endereco, texto} do que ja' virou objeto nesta conversa
+
+function pintarCesta(){
+  const n = document.getElementById("cesta-n");
+  if(n) n.textContent = SELECAO.size + " selecionada" + (SELECAO.size===1?"":"s");
+  const b = document.getElementById("salvar-lista");
+  if(b) b.disabled = SELECAO.size === 0;
+}
+function alternar(endereco, el){
+  if(!endereco) return;
+  if(SELECAO.has(endereco)){ SELECAO.delete(endereco); el.classList.remove("marcada"); }
+  else { SELECAO.add(endereco); el.classList.add("marcada"); }
+  pintarCesta(); sugerir();
+}
+async function sugerir(){
+  const campo = document.getElementById("nome-lista");
+  const alvo = document.getElementById("sug");
+  if(!campo || !alvo) return;
+  const d = await chamar("api/sugerir", {parcial:campo.value, enderecos:[...SELECAO]});
+  if(!d || d.erro){ alvo.innerHTML=""; return; }
+  let h = "";
+  for(const e of (d.acervo||[]).slice(0,6))
+    h += `<button class="bp" data-nome="${esc(e.nome)}">${esc(e.nome)} <span style="opacity:.6">acervo</span></button>`;
+  for(const e of (d.grafo||[]).slice(0,6))
+    h += `<button class="bp" data-nome="${esc(e.nome)}">${esc(e.nome)} <span style="opacity:.6">ligado</span></button>`;
+  if((d.repetidos||[]).length)
+    h += `<span class="dica">nome repetido no acervo: ${d.repetidos.slice(0,4).map(esc).join(", ")}</span>`;
+  alvo.innerHTML = h;
+  alvo.querySelectorAll("button[data-nome]").forEach(b=>{
+    b.onclick = () => { campo.value = b.dataset.nome; sugerir(); };
+  });
+}
+
+async function perguntar(q){
+  const el = juntar("msg eu", q);
+  const reg = await registrarTexto(q, "pergunta");
+  if(reg.ok){
+    const marca = document.createElement("div");
+    marca.className = "dica";
+    marca.textContent = "cadeia: " + reg.endereco.slice(0,12) + "…";
+    el.appendChild(marca);
+    MENSAGENS.push({endereco:reg.endereco, texto:q});
+    botoes(el, [{rotulo:"marcar", dica:"selecionar esta mensagem para guardar numa lista",
+                 feito:"marcada", fazer:async ()=>{ alternar(reg.endereco, el); return {ok:true}; }}]);
+  }
+  let r = "", dd = null;
+  if(modo!=="servidor"){
+    r = "modo estático: a conversa precisa do servidor.";
+  } else {
+    dd = await chamar("api/chat", {q:q, modo:(document.getElementById("modo-sel")||{}).value || "acervo", janela:JANELA});
+    r = (dd && dd.resposta) || "(sem resposta)";
+    if(dd && dd.modo==="modelo") r = "[modelo de fora — nada aqui passou pelo juiz]\n\n" + r;
+  }
+  const resp = juntar("msg sis pre", r);
+  botoes(resp, [
+    {rotulo:"guardar nas anotações", dica:"esta resposta vira um objeto do acervo",
+     feito:"guardado", fazer:()=>registrarTexto(r, "resposta")},
+    {rotulo:"marcar", dica:"salva a resposta como objeto E a seleciona",
+     feito:"marcada",
+     fazer:async ()=>{ const g = await registrarTexto(r, "resposta");
+       if(!g.ok) return g;
+       MENSAGENS.push({endereco:g.endereco, texto:r});
+       alternar(g.endereco, resp); return {ok:true, endereco:g.endereco}; }},
+  ]);
+  if(dd && dd.janela){
+    const jj = document.createElement("div");
+    jj.className = "dica ligado";
+    jj.textContent = "meta-janela usada: " + dd.janela.nome + " — " + dd.janela.papel;
+    resp.appendChild(jj);
+  }
+}
+
+async function carregarJanelas(){
+  const sel = document.getElementById("janela");
+  if(!sel || modo!=="servidor") return;
+  try{
+    const d = await (await fetch("api/agentes")).json();
+    const ags = d.agentes || [];
+    sel.innerHTML = '<option value="">— meta-janela: nenhuma —</option>' +
+      ags.map(a=>`<option value="${esc(a.nome)}">${esc(a.nome)} — ${esc(a.papel||"")}</option>`).join("");
+    sel.onchange = () => { JANELA = sel.value; estadoSessao(ags.length); };
+    estadoSessao(ags.length);
+  }catch(e){ estadoSessao(0); }
+}
+
+function estadoSessao(n){
+  const alvo = document.getElementById("sessao-estado");
+  if(!alvo) return;
+  const m = (document.getElementById("modo-sel")||{}).value || "acervo";
+  alvo.innerHTML = "lendo o acervo <b>ao vivo</b> · " + n + " meta-janela(s)"
+    + (JANELA ? " · <b>" + esc(JANELA) + "</b>" : "")
+    + (m==="modelo" ? ' · <span style="color:#e8a">a pergunta SAI da máquina</span>' : " · nada sai");
 }
 
 async function desenharAcervo(){
   const alvo = document.getElementById("acervo-corpo");
-  if(!alvo || modo!=="servidor") return;
+  if(!alvo) return;
+  if(modo!=="servidor"){ alvo.innerHTML='<p class="dica">precisa do servidor.</p>'; return; }
   alvo.innerHTML = '<p class="dica">lendo…</p>';
   try{
     const e = await (await fetch("api/estado")).json();
@@ -345,37 +521,52 @@ async function desenharAcervo(){
     const g = await (await fetch("api/grafo")).json();
     let h = `<div class="cards">
       <div class="card"><b>${e.objetos}</b><span>objetos</span></div>
-      <div class="card"><b>${e.quantos_midia}</b><span>mídias</span></div>
-      <div class="card"><b>${e.quantos_texto}</b><span>textos</span></div>
-      <div class="card"><b>${e.orfaos.length}</b><span>sem alcance</span></div></div>`;
-
+      <div class="card"><b>${e.quantos_midia??m.quantas}</b><span>mídias</span></div>
+      <div class="card"><b>${e.quantos_texto??"—"}</b><span>textos</span></div>
+      <div class="card"><b>${(e.orfaos||[]).length}</b><span>sem alcance</span></div></div>`;
     h += "<h2>o que não é texto</h2>";
     if(!m.quantas) h += '<p class="dica">nenhuma mídia.</p>';
     for(const x of m.midias){
       const quem = x.apontado_por.length ? "apontado por "+x.apontado_por.map(y=>y.slice(0,12)).join(", ") : "NINGUÉM aponta";
-      h += `<div class="obj midia">${esc(x.tipo_de_midia)} · ${x.bytes} bytes · ${esc(x.procedencia)} · ${esc(quem)}
-        <audio controls preload="none" src="bytes/${esc(x.endereco)}"></audio>
-        <div class="dica">${esc(x.endereco)}</div></div>`;
+      h += `<div class="obj midia"><div class="rot">${esc(x.tipo_de_midia)} · ${x.bytes} bytes · ${esc(x.procedencia)}</div>
+        <audio controls preload="none" src="api/bytes/${esc(x.endereco)}"></audio>
+        <div class="dica">${esc(quem)}</div></div>`;
     }
-
     h += "<h2>por espécie</h2><table>";
     for(const k of Object.keys(e.por_especie).sort())
       h += `<tr><td>${esc(k)}</td><td>${e.por_especie[k]}</td></tr>`;
     h += "</table>";
-
-    const vivos = g.nos.filter(n=>n.grau_saida>0).sort((a,b)=>b.grau_saida-a.grau_saida).slice(0,10);
-    h += "<h2>os mais citados</h2><table>";
-    for(const n of vivos)
-      h += `<tr><td>${esc(n.endereco.slice(0,12))}…</td><td>${esc(n.nome||n.tipo||"conteúdo")}</td><td>${n.grau_saida}</td></tr>`;
-    h += "</table>";
-
-    if(e.orfaos.length){
+    const cit = (g.nos||[]).filter(n=>n.grau_saida>0).sort((a,b)=>b.grau_saida-a.grau_saida).slice(0,10);
+    if(cit.length){
+      h += "<h2>os mais citados</h2><table>";
+      for(const n of cit) h += `<tr><td>${esc(n.endereco.slice(0,12))}…</td><td>${n.grau_saida}</td></tr>`;
+      h += "</table>";
+    }
+    if((e.orfaos||[]).length){
       h += "<h2>sem tipo e sem alcance</h2>";
-      for(const o of e.orfaos)
-        h += `<div class="obj orfa">${esc(o.endereco)}<div class="dica">${o.bytes} bytes · ${esc(o.procedencia)}</div></div>`;
+      for(const o of e.orfaos) h += `<div class="obj orfa">${esc(o.endereco)}
+        <div class="dica">${o.bytes} bytes · ${esc(o.procedencia)}</div></div>`;
     }
     alvo.innerHTML = h;
-  }catch(err){ alvo.innerHTML = '<div class="av">não consegui ler o acervo: '+esc(err.message)+'</div>'; }
+  }catch(err){ alvo.innerHTML = '<div class="av">não consegui ler: '+esc(err.message)+'</div>'; }
+}
+
+async function desenharAnotacoes(){
+  const alvo = document.getElementById("rec-lista");
+  if(!alvo) return;
+  if(modo!=="servidor"){ alvo.innerHTML='<p class="dica">precisa do servidor.</p>'; return; }
+  try{
+    const m = await (await fetch("api/midias")).json();
+    const minhas = (m.midias||[]).filter(x=>x.procedencia==="acervo");
+    if(!minhas.length){ alvo.innerHTML='<p class="dica">nenhuma anotação ainda.</p>'; return; }
+    let h = "";
+    for(const x of minhas){
+      h += `<div class="obj midia"><div class="rot">${esc(x.tipo_de_midia)} · ${x.bytes} bytes</div>
+        <audio controls preload="none" src="api/bytes/${esc(x.endereco)}"></audio>
+        <div class="dica">${esc(x.endereco.slice(0,16))}…</div></div>`;
+    }
+    alvo.innerHTML = h;
+  }catch(err){ alvo.innerHTML='<div class="av">não consegui ler: '+esc(err.message)+'</div>'; }
 }
 
 function camposDe(){
@@ -412,10 +603,37 @@ document.getElementById("enviar").onclick = ()=>{
   const i = document.getElementById("q"); const q = i.value.trim(); if(!q) return; i.value=""; perguntar(q);
 };
 document.getElementById("q").onkeydown = e => { if(e.key==="Enter") document.getElementById("enviar").click(); };
-document.getElementById("acima").onclick = async ()=>{
+async function atualizarEstado(){
+  // O ACERVO E' AO VIVO. Antes havia um botao "sincronizar" porque a pagina
+  // comecava como retrato parado; agora ela le' ao abrir, como os paineis.
   if(modo!=="servidor"){ render(DADOS); return; }
-  const r = await fetch("api/estado",{cache:"no-store"}); render(await r.json());
+  try{ const r = await fetch("api/estado",{cache:"no-store"}); render(await r.json()); }
+  catch(e){ /* sem servidor: fica o retrato que ja' esta' na tela */ }
+}
+const nL = document.getElementById("nome-lista");
+if(nL) nL.oninput = sugerir;
+const bL = document.getElementById("limpar");
+if(bL) bL.onclick = () => { SELECAO.clear();
+  document.querySelectorAll(".marcada").forEach(e=>e.classList.remove("marcada"));
+  pintarCesta(); sugerir(); };
+const bS = document.getElementById("salvar-lista");
+if(bS) bS.onclick = async () => {
+  const antes = bS.textContent; bS.disabled = true; bS.textContent = "guardando…";
+  const d = await chamar("api/listar", {nome:(nL?nL.value:""), enderecos:[...SELECAO]});
+  const est = document.getElementById("cesta-estado");
+  if(d && d.lista){
+    est.innerHTML = "lista <b>" + esc(d.lista.slice(0,12)) + "…</b> com " + d.itens
+      + " item(ns)" + (d.vazia ? " — <b>sem nome</b>, para organizar depois" : "");
+    SELECAO.clear();
+    document.querySelectorAll(".marcada").forEach(e=>e.classList.remove("marcada"));
+    if(nL) nL.value = "";
+    pintarCesta(); sugerir();
+  } else { est.textContent = (d && d.erro) || "falhou"; }
+  bS.textContent = antes; bS.disabled = false;
 };
+const mSel = document.getElementById("modo-sel");
+if(mSel) mSel.onchange = () => estadoSessao(0);
+carregarJanelas();
 document.getElementById("bnotif").onclick = async ()=>{
   try{
     const p = await Notification.requestPermission();
@@ -437,50 +655,34 @@ const dizRec = t => { if(recEst) recEst.textContent = t; };
 if(bRec) bRec.onclick = async () => {
   if(gravador && gravador.state==="recording"){ gravador.stop(); return; }
   if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
-    return dizRec("este navegador nao da' acesso ao microfone (a pagina precisa ser SERVIDA, nao aberta como arquivo).");
+    return dizRec("este navegador nao da' acesso ao microfone. a pagina precisa ser SERVIDA (http), nao aberta como arquivo.");
   }
   let fluxo;
   try { fluxo = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ return dizRec("o microfone foi recusado: "+e.name); }
+  catch(e){ return dizRec("o microfone foi recusado: "+e.name+" — a pagina precisa de https ou localhost."); }
   pedacos=[];
   gravador = new MediaRecorder(fluxo);
   gravador.ondataavailable = ev => { if(ev.data && ev.data.size) pedacos.push(ev.data); };
   gravador.onstop = async () => {
     fluxo.getTracks().forEach(t=>t.stop());
-    bRec.textContent="🎤"; bRec.classList.remove("on");
+    bRec.textContent="● gravar"; bRec.classList.remove("on");
     const b = new Blob(pedacos, {type: gravador.mimeType || "audio/webm"});
     const seg = ((Date.now()-t0)/1000).toFixed(1);
-    dizRec("gravado: "+seg+"s, "+b.size+" bytes — enviando...");
+    if(!b.size) return dizRec("nada foi gravado — os pedacos vieram vazios.");
+    dizRec("gravado: "+seg+" s, "+b.size+" bytes — guardando...");
     try{
       const r = await fetch("api/gravar", {method:"POST",
         headers:{"Content-Type":"application/octet-stream"}, body:b});
       const d = await r.json();
       if(d.erro) return dizRec("o servidor recusou: "+d.erro);
-      dizRec("");
-      const caixa = document.createElement("div");
-      const a = document.createElement("audio");
-      a.controls = true; a.preload = "none"; a.src = "bytes/"+d.conteudo;
-      caixa.appendChild(a);
-      const leg = document.createElement("div");
-      leg.className = "dica";
-      leg.textContent = seg+"s · "+d.bytes+" bytes · "+d.tipo_de_midia;
-      caixa.appendChild(leg);
-      juntar("msg eu", caixa);
-      juntar("msg sis pre",
-        "guardado em "+d.onde+" (sigilo: "+d.sigilo+").\n"
-        + "conteúdo:  "+d.conteudo+"\n"
-        + "anotação: "+(d.anotacao||"")+"\n\n"
-        + (d.conteudo_novo ? "nasceu agora" : "este áudio JÁ EXISTIA — o mesmo conteúdo tem o mesmo nome, e nada foi reescrito")
-        + ".\nAo cânone é ato separado: nada aqui saiu do lugar privado.");
+      dizRec("guardado"+(d.conteudo_novo?" agora":" (este audio JA EXISTIA — o mesmo conteudo tem o mesmo nome)")+". ouça abaixo.");
+      desenharAnotacoes();
     }catch(e){ dizRec("nao consegui falar com o servidor: "+e.message); }
   };
   gravador.start();
-  t0=Date.now(); bRec.textContent="■"; bRec.classList.add("on");
-  dizRec("gravando... toque de novo para parar.");
+  t0=Date.now(); bRec.textContent="■ parar"; bRec.classList.add("on");
+  dizRec("gravando...");
 };
-
-const bAc=document.getElementById("bt-acervo");
-if(bAc) bAc.onclick = desenharAcervo;
 
 </script>
 </body>

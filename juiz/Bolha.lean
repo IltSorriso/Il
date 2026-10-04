@@ -533,6 +533,12 @@ def registroEspecies : List (String × List String) :=
     -- isso o carimbo mora FORA da coisa carimbada: carimbar nao muda o endereco
     -- de quem foi carimbado.
     ("carimbo",      ["tipo", "objeto", "tempo", "licenca"]),
+    -- A LISTA: a PRIMEIRA forma cuja ligacao nasce de uma ESCOLHA, e nao de um
+    -- fato do acervo. Uma musica tem partes porque e' uma musica; uma lista tem
+    -- itens porque alguem os juntou. `nome` pode ficar VAZIO — e' a lista-caixa,
+    -- para organizar depois. `partes` e' reusado, entao o juiz ja' confere a
+    -- reuniao sem uma linha nova de verificacao.
+    ("lista",        ["tipo", "nome", "partes", "licenca"]),
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.

@@ -420,6 +420,157 @@ def gravar(raiz, dados):
             "nota": "nasceu PRIVADO. O canone e' ato separado."}
 
 
+def _por_no_privado(raiz, dados):
+    """Escreve bytes no acervo PRIVADO. Devolve (endereco, e_novo)."""
+    import hashlib as _h
+    destino = os.path.join(raiz, "deposito/objetos")
+    os.makedirs(destino, exist_ok=True)
+    h = _h.sha256(dados).hexdigest()
+    novo = not os.path.exists(os.path.join(destino, h))
+    if novo:
+        with open(os.path.join(destino, h), "wb") as f:
+            f.write(dados)
+    return h, novo
+
+
+def apontar(raiz, alvo):
+    """Uma ANOTACAO que aponta para um objeto que JA' existe.
+
+    E' a forma que o acervo ja' tem — `tipo, conteudo, licenca`, e `conteudo` e'
+    literalmente "onde vive o endereco do conteudo". NAO precisa de especie nova.
+    Serve para marcar uma mensagem da conversa, ou apontar de volta para ela.
+    """
+    import re as _re
+    if not _re.match(r"^[0-9a-f]{64}$", alvo or ""):
+        return {"erro": "endereco invalido — sao 64 hex"}
+    destino = os.path.join(raiz, "deposito/objetos")
+    if not os.path.exists(os.path.join(destino, alvo)):
+        return {"erro": "esse objeto nao esta' no acervo privado"}
+    texto = "tipo: anotacao\nconteudo: %s\nlicenca: reservado\n" % alvo
+    h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
+    return {"onde": "deposito/objetos", "sigilo": "privado",
+            "aponta_para": alvo, "anotacao": h, "anotacao_nova": novo,
+            "nota": "anotacao apontando — nasceu PRIVADA"}
+
+
+def registrar(raiz, texto, papel="pergunta"):
+    """Grava UMA mensagem da conversa, de forma ESTRUTURADA.
+
+    Tres objetos, todos de especies que JA' existem — nenhuma especie nova, e
+    nenhuma linha mexida no juiz:
+        conteudo  = o texto da mensagem
+        anotacao  = aponta para o texto
+        carimbo   = carimba o INSTANTE na anotacao
+
+    A ORDEM vem do carimbo, e e' isso que faz disto uma CADEIA — cada mensagem
+    e' alcancavel a partir do carimbo dela, e os carimbos se ordenam no tempo.
+    """
+    import re as _re, time as _t
+    if not (texto or "").strip():
+        return {"erro": "mensagem vazia"}
+    if papel not in ("pergunta", "resposta", "nota", "marca"):
+        return {"erro": "papel desconhecido: %s" % papel}
+    h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
+    ta = "tipo: anotacao\nconteudo: %s\nlicenca: reservado\n" % h
+    ha, nova = _por_no_privado(raiz, ta.encode("utf-8"))
+    # O CARIMBO e' o elo: ele aponta para a anotacao e diz QUANDO.
+    # O tempo vai em SEGUNDOS DE EPOCA — o formato nao aceita ':' no valor, e a
+    # epoca e' a mesma unidade que o git usa, entao os dois tempos sao comparaveis.
+    tc = "tipo: carimbo\nobjeto: %s\ntempo: %d\nlicenca: reservado\n" % (ha, int(_t.time()))
+    hc, novo_c = _por_no_privado(raiz, tc.encode("utf-8"))
+    return {"onde": "deposito/objetos", "sigilo": "privado", "papel": papel,
+            "conteudo": h, "conteudo_novo": novo, "bytes": len(texto.encode("utf-8")),
+            "anotacao": ha, "anotacao_nova": nova,
+            "carimbo": hc, "carimbo_novo": novo_c,
+            "nota": "tres objetos, tres especies que ja' existiam. nasceu PRIVADO."}
+
+
+def sugerir(raiz, enderecos=None, parcial="", ambito=""):
+    """NOMES SUGERIDOS PELO PROPRIO SISTEMA — sem rede, sem modelo.
+
+    Tres origens, e CADA UMA DIZ DE ONDE VEIROU. Nao ha sugestao anonima: quem
+    le' precisa poder separar o que o acervo AFIRMA do que um modelo opinou.
+
+      acervo  — nomes que JA' existem no deposito e casam com o que voce digitou
+      grafo   — objetos LIGADOS aos que voce escolheu (quem os aponta, o que apontam)
+      forma   — as listas que ja' existem: repetir nome e' visivel, nao silencioso
+    """
+    enderecos = [e for e in (enderecos or []) if isinstance(e, str) and len(e) == 64]
+    objs = objetos(raiz)
+    dentro = _quem_aponta(objs)
+    p = (parcial or "").strip().lower()
+
+    # ---- acervo: os nomes que ja' existem ----
+    existentes = []
+    for o in objs:
+        n = (o.get("nome") or o["campos"].get("titulo") or "").strip()
+        if n:
+            existentes.append({"nome": n, "especie": o.get("tipo") or "(conteudo)",
+                               "endereco": o["endereco"]})
+    vistos = {}
+    for e in existentes:
+        vistos.setdefault(e["nome"].lower(), []).append(e)
+    repetidos = sorted(k for k, v in vistos.items() if len(v) > 1)
+
+    acervo = [e for e in existentes if p and p in e["nome"].lower()][:12]
+    if not p:
+        acervo = sorted(existentes, key=lambda e: e["nome"].lower())[:12]
+
+    # ---- grafo: o que esta' ligado ao que voce escolheu ----
+    ligados, vistos_l = [], set()
+    for e in enderecos:
+        for quem in dentro.get(e, []):
+            if quem not in vistos_l:
+                vistos_l.add(quem)
+                o = next((x for x in objs if x["endereco"] == quem), None)
+                if o:
+                    ligados.append({"endereco": quem, "especie": o.get("tipo") or "(conteudo)",
+                                    "nome": (o.get("nome") or o["campos"].get("titulo") or "")
+                                            or "(sem nome proprio)",
+                                    "porque": "aponta para um dos escolhidos"})
+        o = next((x for x in objs if x["endereco"] == e), None)
+        if o:
+            for alvo in _hexes(o):
+                if alvo in vistos_l or alvo in enderecos:
+                    continue
+                vistos_l.add(alvo)
+                t = next((x for x in objs if x["endereco"] == alvo), None)
+                if t:
+                    ligados.append({"endereco": alvo, "especie": t.get("tipo") or "(conteudo)",
+                                    "nome": (t.get("nome") or t["campos"].get("titulo") or "")
+                                            or "(sem nome proprio)",
+                                    "porque": "e' apontado por um dos escolhidos"})
+
+    return {"acervo": acervo, "grafo": ligados[:12],
+            "repetidos": repetidos,
+            "nota": ("tudo aqui veio do proprio acervo — nada saiu da maquina. "
+                     "o modelo, quando usado, e' camada ADICIONAL e dira' que saiu."),
+            "fonte": "proprio sistema"}
+
+
+def criarLista(raiz, nome, enderecos):
+    """A LISTA: nome (pode ser VAZIO) + os itens que voce juntou.
+
+    Os itens vao no campo `partes`, cuja relacao e' `reuniao` — e o juiz JA'
+    CONFERE reuniao, entao esta lista nasce verificada sem uma linha nova.
+    Nasce PRIVADA, como tudo que a tela grava.
+    """
+    itens = [e for e in (enderecos or []) if isinstance(e, str) and len(e) == 64]
+    destino = os.path.join(raiz, "deposito/objetos")
+    for e in itens:
+        if not os.path.exists(os.path.join(destino, e)):
+            return {"erro": "nao achei o objeto %s no acervo privado" % e[:12]}
+    nome = (nome or "").strip()
+    texto = ("tipo: lista\nnome: %s\npartes: %s\nlicenca: reservado\n"
+             % (nome, ",".join(itens)))
+    h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
+    return {"onde": "deposito/objetos", "sigilo": "privado", "lista": h,
+            "lista_nova": novo, "nome": nome, "itens": len(itens),
+            "vazia": nome == "",
+            "nota": ("lista sem nome: e' a caixa para organizar depois."
+                     if nome == "" else "lista nomeada.")}
+
+
 def _hexes(o):
     """Todo valor de 64 hex que aparece em QUALQUER campo deste objeto."""
     import re as _re
@@ -656,16 +807,50 @@ def _resposta_acervo(raiz, q):
             "e' outro ato: ele manda a pergunta para fora da maquina.")
 
 
-def conversar(raiz, pergunta, modo="acervo"):
+def janelaDe(raiz, nome):
+    """A META-JANELA escolhida, resolvida do acervo.
+
+    HONESTIDADE: a especie `agente` carrega `nome`, `papel` e `texto` — e NAO
+    carrega as FONTES do recorte. Entao trocar de meta-janela muda o contexto
+    dado ao MODELO, mas NAO muda o que o acervo responde: o acervo responde o
+    mesmo, porque le' o mesmo deposito. Isto e' um limite medido, nao um enfeite.
+    """
+    if not nome:
+        return None
+    for o in objetos(raiz):
+        if o.get("tipo") != "agente":
+            continue
+        if (o.get("nome") or o["campos"].get("nome")) == nome:
+            t = o["campos"].get("texto") or ""
+            corpo = ""
+            if len(t) == 64:
+                caminho = os.path.join(raiz, "deposito/objetos", t)
+                if not os.path.exists(caminho):
+                    caminho = os.path.join(raiz, "exemplos/deposito/objetos", t)
+                try:
+                    with open(caminho, "rb") as f:
+                        corpo = f.read().decode("utf-8", "replace")
+                except OSError:
+                    corpo = ""
+            return {"nome": nome, "papel": o["campos"].get("papel") or "",
+                    "texto": t, "convencao": corpo, "endereco": o["endereco"]}
+    return None
+
+
+def conversar(raiz, pergunta, modo="acervo", janela=None):
     """A conversa. Duas naturezas, e a resposta DIZ qual foi usada.
 
     `acervo` (padrao): le' o deposito, responde FATO, nada sai da maquina.
     `modelo`: manda a pergunta para FORA e devolve o que voltar. Nao e' o
       acervo falando — e' um modelo opinando, e a resposta nao finge o contrario.
     """
+    j = janelaDe(raiz, janela) if janela else None
     if modo != "modelo":
-        return {"modo": "acervo", "saiu_da_maquina": False,
-                "resposta": _resposta_acervo(raiz, pergunta), "fontes": []}
+        r = _resposta_acervo(raiz, pergunta)
+        if j:
+            r = ("[meta-janela: %s — %s]\n(ela NAO muda esta resposta: o acervo le' o "
+                 "mesmo deposito. ela muda o contexto dado ao MODELO.)\n\n" % (j["nome"], j["papel"])) + r
+        return {"modo": "acervo", "saiu_da_maquina": False, "janela": j, "resposta": r, "fontes": []}
     if not pergunta:
         return {"modo": "modelo", "saiu_da_maquina": False,
                 "resposta": "pergunta vazia."}
@@ -676,7 +861,11 @@ def conversar(raiz, pergunta, modo="acervo"):
         return {"modo": "modelo", "saiu_da_maquina": False,
                 "resposta": "o modulo cli/modelo nao esta' aqui."}
     try:
-        r = _sp.run(["python3", script, pergunta], capture_output=True, text=True, timeout=90)
+        com = pergunta
+        if j and j["convencao"]:
+            com = ("Convencao desta meta-janela (%s):\n%s\n\nPergunta: %s"
+                   % (j["nome"], j["convencao"], pergunta))
+        r = _sp.run(["python3", script, com], capture_output=True, text=True, timeout=90)
     except _sp.TimeoutExpired:
         return {"modo": "modelo", "saiu_da_maquina": True, "resposta": "o modelo nao respondeu em 90 s."}
     except OSError as erro:
@@ -684,7 +873,7 @@ def conversar(raiz, pergunta, modo="acervo"):
     if r.returncode != 0:
         return {"modo": "modelo", "saiu_da_maquina": True,
                 "resposta": "o modelo recusou (codigo %d):\n%s" % (r.returncode, (r.stderr or "")[:400])}
-    return {"modo": "modelo", "saiu_da_maquina": True,
+    return {"modo": "modelo", "saiu_da_maquina": True, "janela": j,
             "resposta": (r.stdout or "").strip(),
             "aviso": "isto NAO e' o acervo: e' um modelo de fora. Nada aqui foi conferido pelo juiz."}
 
@@ -970,10 +1159,26 @@ class Mao(BaseHTTPRequestHandler):
             alvo, resto = (A.get(partes[0]), partes[1:]) if partes else (None, [])
         if alvo is None:
             return self.responder({"erro": "ambito desconhecido"}, 404)
+        if resto and resto[0] == "sugerir":
+            b = self.corpo()
+            return self.responder(sugerir(alvo, b.get("enderecos") or [],
+                                          b.get("parcial") or ""))
+        if resto and resto[0] == "listar":
+            b = self.corpo()
+            return self.responder(criarLista(alvo, b.get("nome") or "",
+                                             b.get("enderecos") or []))
+        if resto and resto[0] == "apontar":
+            b = self.corpo()
+            return self.responder(apontar(alvo, (b.get("objeto") or "").strip()))
+        if resto and resto[0] == "registrar":
+            b = self.corpo()
+            return self.responder(registrar(alvo, b.get("texto") or "",
+                                            (b.get("papel") or "pergunta").strip()))
         if resto and resto[0] == "chat":
             b = self.corpo()
             return self.responder(conversar(alvo, (b.get("q") or "").strip(),
-                                            b.get("modo") or "acervo"))
+                                            b.get("modo") or "acervo",
+                                            (b.get("janela") or "").strip() or None))
         if resto and resto[0] == "gravar":
             return self.responder(gravar(alvo, self.corpo_bytes()))
         b = self.corpo()
