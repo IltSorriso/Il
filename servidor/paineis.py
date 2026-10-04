@@ -194,9 +194,10 @@ def _rastreados(raiz):
 def tempo(raiz, objs):
     """A linha do tempo — e as DUAS naturezas de tempo, ditas separadas.
 
-    O tempo de GUARDAR e' lido do git. O tempo do MUNDO so' existe quando
-    houver carimbos: nenhuma especie os declara ainda, mas os campos `tempo` e
-    `tempo_criacao` ja' estao no vocabulario esperando a primeira gravacao.
+    O tempo de GUARDAR e' lido do git. O tempo do MUNDO vem dos objetos da
+    especie `carimbo`: cada um aponta (`objeto`) para o que carimba e diz
+    (`tempo`) quando. O carimbo mora FORA da coisa carimbada — por isso
+    carimbar nao muda o endereco de quem foi carimbado.
     """
     quando = {}
     for rel in sorted({o["caminho_rel"] for o in objs}):
@@ -208,8 +209,16 @@ def tempo(raiz, objs):
     carimbos = {}
     for o in objs:
         if o["tipo"] == "carimbo":
+            bruto = o["campos"].get("tempo", "?")
+            # O deposito guarda o INSTANTE (segundos de epoca, sem dois-pontos —
+            # o formato nao os admite). A tela devolve a forma legivel: e' uma
+            # PROJECAO, nao um segundo dado guardado.
+            try:
+                legivel = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(bruto)))
+            except (ValueError, OverflowError):
+                legivel = "?"
             carimbos.setdefault(o["campos"].get("objeto", "?"), []).append(
-                {"tempo": o["campos"].get("tempo", "?"), "endereco": o["endereco"]})
+                {"tempo": bruto, "legivel": legivel, "endereco": o["endereco"]})
     dias, sem_git, sem_data = defaultdict(list), [], []
     for o in objs:
         e = o["endereco"]
@@ -236,8 +245,9 @@ def tempo(raiz, objs):
         "versionado_sem_data": sem_data,
         "naturezas": {
             "de_guardar": "lido do git a cada chamada, nunca copiado para a bolha",
-            "do_mundo": ("dos carimbos — os campos `tempo` e `tempo_criacao` ja' existem; "
-                         "falta a especie que os carrega e o primeiro objeto gravado"),
+            "do_mundo": ("dos objetos `carimbo` — `objeto` diz o que foi carimbado e "
+                         "`tempo` diz quando, no mundo; o git nao sabe disso, so' sabe "
+                         "quando o objeto ENTROU no deposito"),
         },
         "carimbos": carimbos,
         "como_ler": ("cada dia e' o compromisso em que aqueles objetos ENTRARAM no deposito. "
