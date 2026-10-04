@@ -184,13 +184,23 @@ structure Manifesto where
 -/
 structure Conteudo where
   campo : String
-  /-- O conteúdo desta espécie é TEXTO? — e é isto que decide se a PORTA DO
-      TEXTO CANÔNICO (`textoOk`) se aplica. -/
+  /-- O conteúdo desta espécie TEM de ser TEXTO? Duas coisas separadas, que
+      antes eram uma só e por isso reprovavam a mídia com a mensagem errada:
+
+      - `texto = true`  → o conteúdo TEM de ser texto; se não for, é FALHA com
+        o nome da espécie (`musica`, `parte`, `declaracao`: a letra de uma
+        parte não pode ser um áudio).
+      - `texto = false` → o conteúdo PODE não ser texto (`anotacao`: aponta
+        para o que houver). Se FOR texto, a porta canônica ainda se aplica —
+        a forma não é dispensada só porque a exigência caiu.
+
+      A PORTA em si passou a perguntar aos BYTES (`String.fromUTF8?`), não à
+      espécie: é o conteúdo que sabe se é texto. A espécie só diz se exige. -/
   texto : Bool
   deriving Repr, BEq
 
 def registroConteudo : List (String × Conteudo) :=
-  [ ("anotacao", { campo := "conteudo", texto := true }),
+  [ ("anotacao", { campo := "conteudo", texto := false }),
     ("musica",   { campo := "letra",    texto := true }),
     ("parte",    { campo := "letra",    texto := true }),
     ("declaracao", { campo := "texto",   texto := true }) ]
@@ -517,6 +527,12 @@ def registroEspecies : List (String × List String) :=
     ("declaracao", ["tipo", "ramo", "prazo", "texto", "licenca"]),
     ("agente",     ["tipo", "nome", "papel", "texto", "licenca"]),
     ("proposito",  ["tipo", "nome", "papel", "texto", "licenca"]),
+    -- O CARIMBO: o ATO de dizer QUANDO. `objeto` aponta para o que se carimba;
+    -- `tempo` e' o instante do MUNDO, que o git nao sabe — o git so' sabe
+    -- quando o objeto ENTROU no deposito. Sao duas naturezas de tempo, e por
+    -- isso o carimbo mora FORA da coisa carimbada: carimbar nao muda o endereco
+    -- de quem foi carimbado.
+    ("carimbo",      ["tipo", "objeto", "tempo", "licenca"]),
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.

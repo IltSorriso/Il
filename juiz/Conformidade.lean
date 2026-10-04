@@ -67,25 +67,58 @@ def temReuniao (txt : String) : Bool :=
   | some t => (List.lookup t registroReuniao).isSome
 
 def main : IO UInt32 := do
-  let bom       ← lerDeposito  "exemplos/deposito/objetos"
-  let queb      ← lerDeposito  "exemplos/quebrados/objetos"
-  let instancia? ← lerDepositoOpcional "deposito/objetos"
+  -- ── A PORTA DE ENTRADA: o ÚNICO caminho literal que resta ─────────────
+  -- Para ler os caminhos declarados é preciso ler o cânone; para ler o cânone
+  -- é preciso um caminho. O ciclo PARA AQUI, e só aqui. Os outros dois
+  -- depósitos também estavam escritos literalmente neste ponto — agora vêm da
+  -- bolha `caminho`, que já existia e já era lida para o SIGILO. Mover um
+  -- depósito deixa de ser edição de Lean e passa a ser edição de DADO.
+  let raizCanon := "exemplos/deposito/objetos"
+  let bom       ← lerDeposito raizCanon
+  let declarados : List (String × String) :=
+    (objetosDeTipo bom "caminho").filterMap (fun h =>
+      match objetoTexto bom h with
+      | none     => none
+      | some txt =>
+          let cs := parseCampos txt
+          some ((campo cs "nome").getD "?", (campo cs "padrao").getD "?"))
+  let padraoDe (nome : String) : Option String :=
+    (declarados.find? (fun d => d.1 == nome)).map (fun d => d.2)
+  let quebrados := padraoDe "quebrados"
+  -- NAO chamar de `local`: `local` e' PALAVRA RESERVADA do Lean (local instance,
+  -- local notation). Compilar acusou "unexpected token 'local'".
+  let caminhoLocal := padraoDe "deposito"
+  let queb? ←
+    match quebrados with
+    | some pc => lerDepositoOpcional pc
+    | none    => pure none
+  let instancia? ←
+    match caminhoLocal with
+    | some pl => lerDepositoOpcional pl
+    | none    => pure none
+  let queb      := queb?.getD []
   let instancia := instancia?.getD []
   let dep := bom ++ queb ++ instancia
   -- (c) A PROCEDENCIA. `bom ++ queb ++ instancia` apaga de ONDE cada objeto veio,
   -- e sem isso a lei escrita no Bolha.md (2026-09-13) nao tem por onde olhar:
   -- quem decide e o RECIPIENTE, e o recipiente e o caminho.
+  let rotuloQueb := "(caminho `quebrados` NAO declarado)"
+  let caminhoQueb := quebrados.getD rotuloQueb
   let origens : List (String × Deposito) :=
-    [ ("exemplos/deposito/objetos", bom),
-      ("exemplos/quebrados/objetos", queb),
-      ("deposito/objetos", instancia) ]
+    [ (raizCanon, bom),
+      (caminhoQueb, queb),
+      (caminhoLocal.getD "(caminho `deposito` NAO declarado)", instancia) ]
   let mut falhas := 0
   let mut total := 0
 
+  IO.println s!"porta de entrada (o unico literal): {raizCanon}"
+  let mostrados := String.intercalate ", " (declarados.map (fun d => d.1 ++ "=" ++ d.2))
+  IO.println s!"caminhos lidos das bolhas `caminho`: {mostrados}"
+  let nomeLocal := caminhoLocal.getD "(nao declarada)"
   IO.println s!"depósito: {bom.length} canônicos + {instancia.length} locais + {queb.length} quebrados"
   match instancia? with
-  | some d => IO.println s!"  instância local `deposito/objetos`: PRESENTE — {d.length} objeto(s) conferido(s)"
-  | none   => IO.println "  instância local `deposito/objetos`: AUSENTE — nada a conferir (dito em voz alta, não silenciado)"
+  | some d => IO.println s!"  instância local `{nomeLocal}`: PRESENTE — {d.length} objeto(s) conferido(s)"
+  | none   => IO.println s!"  instância local `{nomeLocal}`: AUSENTE — nada a conferir (dito em voz alta, não silenciado)"
 
   IO.println "--- ENDEREÇAMENTO (sha256 dos BYTES == chave?) ---"
   for (h, bytes) in dep do
@@ -124,7 +157,7 @@ def main : IO UInt32 := do
               | some lt => (campo (parseCampos lt) "sigilo").getD "(sem sigilo)"
               | none    => "(licenca ausente neste deposito)"
             if sc == "publico" && sig == "privado" then
-              if caminho == "exemplos/quebrados/objetos" then
+              if caminho == caminhoQueb then
                 IO.println s!"    {h.take 12}… o fixture quebrado FOI recusado pela lei (privada em caminho publico)"
               else
                 IO.println s!"    {h.take 12}… FALHA: bolha privada em caminho publico"
@@ -166,7 +199,7 @@ def main : IO UInt32 := do
       else if ok then
         IO.println s!"  {h.take 12}… `{tp}` exige `{ex}`: satisfaz"
       else
-        if caminho == "exemplos/quebrados/objetos" then
+        if caminho == caminhoQueb then
           IO.println s!"  {h.take 12}… o fixture quebrado FOI recusado (`{tp}` exige `{ex}`)"
         else
           IO.println s!"  {h.take 12}… FALHA: `{tp}` exige `{ex}`, e a licenca e {lic.getD "(ausente)"}"
@@ -291,6 +324,20 @@ def main : IO UInt32 := do
               IO.println s!"  {nome}: DIFERENTE — o vocabulário diz {chaves}, o registro diz {esperadas}"
               falhas := falhas + 1
 
+      -- A OUTRA DIREÇÃO. O laço acima percorre o VOCABULÁRIO e procura no
+      -- registro: uma espécie que exista SÓ no registro é INVISÍVEL para ele.
+      -- Foi por essa fenda que uma espécie acrescentada só ao leitor passou em
+      -- SILÊNCIO — o juiz disse "0 falhas" sem nada dizer. Aqui o registro é
+      -- percorrido, e o que não estiver no vocabulário lido é dito em voz alta.
+      let lidos := pares.map (fun p => p.1)
+      for (nome, _) in registroEspecies do
+        total := total + 1
+        if lidos.any (fun x => x == nome) then
+          pure ()
+        else
+          IO.println s!"  {nome}: está no registro literal e NÃO está no vocabulário lido"
+          falhas := falhas + 1
+
 
   IO.println "--- A FORMA DO TEXTO (a porta de uma mão do texto canônico) ---"
   let mut textosConferidos := 0
@@ -299,28 +346,35 @@ def main : IO UInt32 := do
     match tipoDe txt with
     | none => pure ()
     | some t =>
-        if !conteudoEhTexto t then
-          -- MÍDIA: a porta do texto canônico não julga o que não é texto.
-          pure ()
-        else
-          match List.lookup t registroConteudo with
-          | none => pure ()
-          | some c =>
-              match campo (parseCampos txt) c.campo with
-              | none => pure ()
-              | some enderecoConteudo =>
-                  total := total + 1
-                  textosConferidos := textosConferidos + 1
-                  match objeto dep enderecoConteudo with
-                  | none =>
-                      IO.println s!"  {h.take 12}… o texto apontado NÃO está no depósito"
-                      falhas := falhas + 1
-                  | some corpo =>
-                      if bytesTextoOk corpo then
-                        IO.println s!"  {h.take 12}… texto canônico ({corpo.size} bytes)"
-                      else
-                        IO.println s!"  {h.take 12}… TEXTO FORA DA FORMA CANÔNICA — outra grafia, outro endereço"
+        match List.lookup t registroConteudo with
+        | none => pure ()
+        | some c =>
+            match campo (parseCampos txt) c.campo with
+            | none => pure ()
+            | some enderecoConteudo =>
+                total := total + 1
+                textosConferidos := textosConferidos + 1
+                match objeto dep enderecoConteudo with
+                | none =>
+                    IO.println s!"  {h.take 12}… o conteudo apontado NAO esta' no deposito"
+                    falhas := falhas + 1
+                | some corpo =>
+                    -- A PORTA PERGUNTA AOS BYTES, nao a especie: e' o conteudo
+                    -- que sabe se e' texto. A ESPECIE so' diz se EXIGE texto.
+                    -- Antes as duas coisas eram uma so, e por isso uma anotacao
+                    -- apontando para um audio reprovava com a mensagem de acento
+                    -- decomposto — a porta julgava o que nao era texto.
+                    if (String.fromUTF8? corpo).isNone then
+                      if conteudoEhTexto t then
+                        IO.println s!"  {h.take 12}… `{t}` EXIGE TEXTO e o conteudo nao e' texto ({corpo.size} bytes)"
                         falhas := falhas + 1
+                      else
+                        IO.println s!"  {h.take 12}… midia ({corpo.size} bytes) — a porta do texto canonico nao julga o que nao e' texto"
+                    else if bytesTextoOk corpo then
+                      IO.println s!"  {h.take 12}… texto canônico ({corpo.size} bytes)"
+                    else
+                      IO.println s!"  {h.take 12}… TEXTO FORA DA FORMA CANÔNICA — outra grafia, outro endereço"
+                      falhas := falhas + 1
   if textosConferidos == 0 then
     IO.println "  nenhum texto a conferir neste depósito (dito em voz alta)"
 
