@@ -256,9 +256,72 @@ def tempo(raiz, objs):
     }
 
 
+def licencas(raiz, objs):
+    """COMO O ACERVO CRESCE POR LICENCA.
+
+    A licenca e' a coluna que diz sob que TERMOS cada objeto vive — e agora
+    tambem o SELO de quem o produziu: um objeto vindo de modelo generativo
+    carrega licenca propria. Entao esta conta separa o que foi escrito por
+    gente do que saiu de um modelo.
+
+    `reservado` NAO e' uma licenca: e' a AUSENCIA deliberada de uma. Fica em
+    linha propria, porque somar as duas seria mentir sobre o que esta' declarado.
+    """
+    import collections
+    # resolver o nome de cada licenca pelo endereco
+    nome_de = {}
+    for o in objs:
+        if o.get("tipo") == "licenca":
+            nome_de[o["endereco"]] = {
+                "nome": (o["campos"].get("nome") or "").strip(),
+                "catalogo": (o["campos"].get("catalogo") or "").strip(),
+                "sigilo": (o["campos"].get("sigilo") or "").strip()}
+    conta = collections.Counter()
+    por_especie = collections.defaultdict(collections.Counter)
+    sem = 0
+    for o in objs:
+        t = o.get("tipo")
+        if not t:
+            continue                       # conteudo nao carrega licenca propria
+        v = (o["campos"].get("licenca") or "").strip()
+        if not v:
+            chave = "(sem campo licenca)"
+        elif v == "reservado":
+            chave = "reservado"
+        elif len(v) == 64:
+            chave = v
+        else:
+            chave = "(valor estranho)"
+        conta[chave] += 1
+        por_especie[chave][t] += 1
+
+    linhas = []
+    for chave, quantos in conta.most_common():
+        info = nome_de.get(chave, {})
+        # O SELO: a licenca cujo catalogo e' `modelo`.
+        selo = (info.get("catalogo") == "modelo")
+        linhas.append({
+            "licenca": chave, "quantos": quantos,
+            "nome": info.get("nome") or ("(ausencia deliberada)" if chave == "reservado" else "(nao declarada)"),
+            "catalogo": info.get("catalogo") or "",
+            "sigilo": info.get("sigilo") or "",
+            "selo_de_modelo": selo,
+            "por_especie": dict(por_especie[chave]),
+        })
+    do_modelo = sum(l["quantos"] for l in linhas if l["selo_de_modelo"])
+    return {"linhas": linhas,
+            "declaradas": sum(1 for l in linhas if len(l["licenca"]) == 64),
+            "sem_declaracao": conta.get("reservado", 0),
+            "do_modelo": do_modelo,
+            "nota": ("`reservado` e' AUSENCIA de licenca, nao uma licenca: fica em "
+                     "linha propria. `selo_de_modelo` marca o que saiu de um modelo "
+                     "generativo — a licenca e' o selo, e viaja no dado.")}
+
+
 def tudo(raiz, objs, grau):
     return {"ambito": raiz,
             "forma": forma(objs),
             "peso": peso(objs),
             "alcance": alcance(objs, grau),
-            "tempo": tempo(raiz, objs)}
+            "tempo": tempo(raiz, objs),
+            "licencas": licencas(raiz, objs)}

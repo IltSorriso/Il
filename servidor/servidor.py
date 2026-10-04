@@ -453,7 +453,29 @@ def apontar(raiz, alvo):
             "nota": "anotacao apontando — nasceu PRIVADA"}
 
 
-def registrar(raiz, texto, papel="pergunta"):
+def licencaDoModelo(raiz):
+    """O ENDERECO da licenca-selo, se ela estiver no acervo.
+
+    Nao se inventa endereco: ele e' LIDO do deposito, procurando a licenca cujo
+    `catalogo` e' `modelo`. Se nao existir, devolve None e quem chama NAO grava
+    o selo — melhor nao marcar do que marcar errado.
+    """
+    for origem in ("exemplos/deposito/objetos", "deposito/objetos"):
+        d = os.path.join(raiz, origem)
+        if not os.path.isdir(d):
+            continue
+        for h in os.listdir(d):
+            try:
+                with open(os.path.join(d, h), "rb") as f:
+                    t = f.read().decode("utf-8", "replace")
+            except OSError:
+                continue
+            if t.startswith("tipo: licenca") and "\ncatalogo: modelo\n" in t:
+                return h
+    return None
+
+
+def registrar(raiz, texto, papel="pergunta", licenca=None):
     """Grava UMA mensagem da conversa, de forma ESTRUTURADA.
 
     Tres objetos, todos de especies que JA' existem — nenhuma especie nova, e
@@ -471,7 +493,11 @@ def registrar(raiz, texto, papel="pergunta"):
     if papel not in ("pergunta", "resposta", "nota", "marca"):
         return {"erro": "papel desconhecido: %s" % papel}
     h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
-    ta = "tipo: anotacao\nconteudo: %s\nlicenca: reservado\n" % h
+    # O SELO: o que saiu de um modelo generativo nasce com a licenca-selo, em vez
+    # de `reservado`. A licenca E' o selo — e viaja no dado, entao a conta do
+    # acervo separa sozinha o que foi escrito por gente do que veio de modelo.
+    lic = licenca if (licenca and len(licenca) == 64) else "reservado"
+    ta = "tipo: anotacao\nconteudo: %s\nlicenca: %s\n" % (h, lic)
     ha, nova = _por_no_privado(raiz, ta.encode("utf-8"))
     # O CARIMBO e' o elo: ele aponta para a anotacao e diz QUANDO.
     # O tempo vai em SEGUNDOS DE EPOCA — o formato nao aceita ':' no valor, e a
@@ -479,6 +505,7 @@ def registrar(raiz, texto, papel="pergunta"):
     tc = "tipo: carimbo\nobjeto: %s\ntempo: %d\nlicenca: reservado\n" % (ha, int(_t.time()))
     hc, novo_c = _por_no_privado(raiz, tc.encode("utf-8"))
     return {"onde": "deposito/objetos", "sigilo": "privado", "papel": papel,
+            "licenca": lic, "selo_de_modelo": lic != "reservado",
             "conteudo": h, "conteudo_novo": novo, "bytes": len(texto.encode("utf-8")),
             "anotacao": ha, "anotacao_nova": nova,
             "carimbo": hc, "carimbo_novo": novo_c,
@@ -1072,7 +1099,7 @@ class Mao(BaseHTTPRequestHandler):
     def rota(self, raiz, resto):
         if not resto:
             return self.responder({"ambito": raiz,
-                                   "rotas": ["estado", "diagnostico", "formulario", "grafo", "painel[/tempo|peso|forma|alcance]",
+                                   "rotas": ["estado", "diagnostico", "formulario", "grafo", "painel[/tempo|peso|forma|alcance|licencas]",
                                              "bytes/<e>", "objeto/<e>", "agentes",
                                              "recorte/<agente>", "compor (POST)"]})
         verbo, args = resto[0], resto[1:]
@@ -1108,14 +1135,15 @@ class Mao(BaseHTTPRequestHandler):
                 g = alcance(objs)
                 if not args:
                     return self.responder(paineis.tudo(raiz, objs, g))
-                if args[0] not in ("tempo", "peso", "forma", "alcance"):
+                if args[0] not in ("tempo", "peso", "forma", "alcance", "licencas"):
                     return self.responder({"erro": "painel desconhecido",
                                            "pedido": args[0],
-                                           "conhecidos": ["tempo", "peso", "forma", "alcance"]}, 404)
-                f = {"tempo":   lambda: paineis.tempo(raiz, objs),
-                     "peso":    lambda: paineis.peso(objs),
-                     "forma":   lambda: paineis.forma(objs),
-                     "alcance": lambda: paineis.alcance(objs, g)}[args[0]]
+                                           "conhecidos": ["tempo", "peso", "forma", "alcance", "licencas"]}, 404)
+                f = {"tempo":    lambda: paineis.tempo(raiz, objs),
+                     "peso":     lambda: paineis.peso(objs),
+                     "forma":    lambda: paineis.forma(objs),
+                     "alcance":  lambda: paineis.alcance(objs, g),
+                     "licencas": lambda: paineis.licencas(raiz, objs)}[args[0]]
                 return self.responder({"ambito": raiz, "painel": args[0], "dados": f()})
             if verbo == "objeto" and len(args) == 1:
                 o = self._achar(raiz, args[0])
@@ -1172,8 +1200,11 @@ class Mao(BaseHTTPRequestHandler):
             return self.responder(apontar(alvo, (b.get("objeto") or "").strip()))
         if resto and resto[0] == "registrar":
             b = self.corpo()
+            lic = (b.get("licenca") or "").strip()
+            if (b.get("selo_de_modelo") or "").strip():
+                lic = licencaDoModelo(alvo) or ""
             return self.responder(registrar(alvo, b.get("texto") or "",
-                                            (b.get("papel") or "pergunta").strip()))
+                                            (b.get("papel") or "pergunta").strip(), lic))
         if resto and resto[0] == "chat":
             b = self.corpo()
             return self.responder(conversar(alvo, (b.get("q") or "").strip(),

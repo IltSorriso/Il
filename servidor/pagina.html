@@ -135,6 +135,11 @@ cada pergunta vira um objeto no acervo: a conversa fica gravada, e não se perde
     <h2>prazos declarados</h2><table id="t-prazo"></table>
     <h2>depósitos que o acervo declara a si mesmo</h2><table id="t-caminho"></table>
     <h2>itinerário</h2><div id="itinerario"></div>
+    <h2>licenças — como o acervo cresce</h2>
+    <p class="dica">a licença é a coluna que diz sob que termos cada objeto vive — e agora
+    também o SELO de quem o produziu: o que saiu de um modelo generativo carrega licença
+    própria. <b>reservado</b> não é licença: é ausência deliberada, e fica em linha própria.</p>
+    <div id="lic-corpo"><p class="dica">lendo…</p></div>
     <h2>os quatro quadros</h2>
     <div id="q-corpo"><p class="dica">calculando…</p></div>
   </section>
@@ -181,7 +186,7 @@ function abrir(qual){
     if(sec) sec.classList.toggle("on", x===qual);
     if(bt) bt.setAttribute("aria-selected", String(x===qual));
   });
-  if(qual==="paineis"){ atualizarEstado(); desenharQuadros(); }
+  if(qual==="paineis"){ atualizarEstado(); desenharQuadros(); desenharLicencas(); }
   if(qual==="acervo") desenharAcervo();
   if(qual==="anotacoes") desenharAnotacoes();
   if(qual==="acrescentar") camposDe();
@@ -631,6 +636,25 @@ if(bS) bS.onclick = async () => {
   } else { est.textContent = (d && d.erro) || "falhou"; }
   bS.textContent = antes; bS.disabled = false;
 };
+async function desenharLicencas(){
+  const alvo = document.getElementById("lic-corpo");
+  if(!alvo || modo!=="servidor") return;
+  try{
+    const r = await (await fetch("api/painel/licencas")).json();
+    const p = r.dados || r;
+    let h = '<table><tr><th>licença</th><th>objetos</th><th>espécies</th></tr>';
+    for(const l of p.linhas){
+      const selo = l.selo_de_modelo ? ' <b style="color:#e8a">selo de modelo</b>' : "";
+      h += `<tr><td>${esc(l.nome)}${selo}<div class="dica">${esc(l.licenca.slice(0,12))}${l.catalogo?" · "+esc(l.catalogo):""}</div></td>
+        <td>${l.quantos}</td>
+        <td class="dica">${esc(Object.entries(l.por_especie).map(([k,v])=>k+":"+v).join(" "))}</td></tr>`;
+    }
+    h += "</table>";
+    h += `<p class="dica">${p.do_modelo} objeto(s) com selo de modelo · ${p.sem_declaracao} sem licença declarada</p>`;
+    alvo.innerHTML = h;
+  }catch(e){ alvo.innerHTML = '<div class="av">não consegui ler: '+esc(e.message)+'</div>'; }
+}
+
 const mSel = document.getElementById("modo-sel");
 if(mSel) mSel.onchange = () => estadoSessao(0);
 carregarJanelas();
