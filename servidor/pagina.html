@@ -52,6 +52,13 @@ input[type=text],select,textarea{width:100%;background:var(--p);border:1px solid
 textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px}
 .av{background:#3a2a12;border-color:#6b4c1c;color:#f0c46a;padding:9px 11px;border-radius:9px;font-size:12.5px;margin-top:10px}
 .ok{background:#12301f;border-color:#25503c;color:#8fe0b5;padding:9px 11px;border-radius:9px;font-size:12.5px;margin-top:10px}
+.gravando{background:#8b1b1b;border-color:#8b1b1b}
+.mic{background:#1d3b2a;border-color:#2c5c40;font-size:1.1em}
+.mic.on{background:#8b1b1b;border-color:#8b1b1b}
+audio{width:100%;margin:5px 0;height:34px}
+.obj{border-left:3px solid #2c5c40;padding:5px 9px;margin:5px 0;background:#0e1512;font-size:.9em}
+.obj.midia{border-color:#8a6d1b}
+.obj.orfa{border-color:#8b1b1b}
 </style>
 </head>
 <body>
@@ -62,33 +69,43 @@ textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px
     <button class="bg" id="bnotif" style="padding:6px 10px;font-size:12px">🔔 notificações</button>
   </div>
   <div class="tabs">
-    <button id="t-painel" aria-selected="true">painel</button>
-    <button id="t-conversa" aria-selected="false">conversa</button>
+    <button id="t-conversa" aria-selected="true">conversa</button>
+    <button id="t-paineis" aria-selected="false">painéis</button>
+    <button id="t-acervo" aria-selected="false">acervo</button>
     <button id="t-compor" aria-selected="false">compor</button>
-  <button id="t-quadros" aria-selected="false">quadros</button>
   </div>
 </header>
 <main>
-  <section id="s-painel" class="on">
+  <section id="s-conversa" class="on">
+    <div id="fala"><div class="msg sis">conversa com o acervo. eu respondo LENDO o depósito — e quando não sei, digo que não sei.
+
+o microfone grava uma nota de voz: ela vira um objeto do acervo (privado) e aparece aqui para ouvir.</div></div>
+    <div id="barra">
+      <input id="q" type="text" placeholder="pergunte ao acervo — ex: prazos / quantos / ajuda" autocomplete="off">
+      <button class="bp" id="enviar">enviar</button>
+      <button class="bp mic" id="bt-gravar" title="gravar nota de voz">🎤</button>
+    </div>
+    <p class="dica" id="rec-estado"></p>
+    <button class="bp" id="acima">⟳ sincronizar o acervo agora</button>
+    <p class="dica" id="modo"></p>
+  </section>
+
+  <section id="s-paineis">
+    <p class="dica">tudo aqui é SAÍDA: calculado na hora a partir do depósito (e, no caso do
+    tempo, do próprio git). Nada é guardado — por isso nada apodrece.</p>
     <div class="cards" id="cards"></div>
     <h2>por espécie</h2><table id="t-especie"></table>
     <h2>prazos declarados</h2><table id="t-prazo"></table>
     <h2>depósitos que o acervo declara a si mesmo</h2><table id="t-caminho"></table>
     <h2>itinerário</h2><div id="itinerario"></div>
-  </section>
-  <section id="s-conversa">
-    <div id="fala"></div>
-    <button id="acima" class="bp">⟳ sincronizar o acervo agora</button>
-    <div id="barra">
-      <input id="q" type="text" placeholder="pergunte ao acervo — ex: prazos / quantos / ajuda" autocomplete="off">
-      <button class="bp" id="enviar">enviar</button>
-    </div>
-    <p class="dica" id="modo"></p>
-  </section>
-  <section id="s-quadros">
-    <p class="dica">os quatro quadros sao SAIDA: calculados na hora a partir do deposito
-    (e, no caso do tempo, do proprio git). Nada aqui e' guardado — por isso nada aqui apodrece.</p>
+    <h2>os quatro quadros</h2>
     <div id="q-corpo"><p class="dica">abra este separador para calcular.</p></div>
+  </section>
+
+  <section id="s-acervo">
+    <button class="bp" id="bt-acervo">⟳ ler o acervo</button>
+    <div id="acervo-corpo"><p class="dica">toque em "ler o acervo" — espécies, objetos,
+    mídias, e o que ninguém alcança.</p></div>
   </section>
 
   <section id="s-compor">
@@ -98,6 +115,7 @@ textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:96px
     <div id="campos"></div>
     <div id="prev"></div>
   </section>
+
 </main>
 <script>
 let DADOS = __SNAPSHOT__;
@@ -105,16 +123,17 @@ const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":
 let modo = "estatico", vivo = false;
 try { modo = (location.protocol==="file:") ? "estatico" : "servidor"; } catch(e){}
 
+const ABAS = ["conversa","paineis","acervo","compor"];
 function abrir(qual){
-  ["painel","conversa","compor","quadros"].forEach(x=>{
-    document.getElementById("s-"+x).classList.toggle("on", x===qual);
-    document.getElementById("t-"+x).setAttribute("aria-selected", String(x===qual));
+  ABAS.forEach(x=>{
+    const sec=document.getElementById("s-"+x), bt=document.getElementById("t-"+x);
+    if(sec) sec.classList.toggle("on", x===qual);
+    if(bt) bt.setAttribute("aria-selected", String(x===qual));
   });
-  if(qual==="quadros") desenharQuadros();
+  if(qual==="paineis") desenharQuadros();
+  if(qual==="acervo") desenharAcervo();
 }
-["painel","conversa","compor","quadros"].forEach(x=>{
-  document.getElementById("t-"+x).onclick = ()=>abrir(x);
-});
+ABAS.forEach(x=>{ const bt=document.getElementById("t-"+x); if(bt) bt.onclick=()=>abrir(x); });
 
 function render(d){
   DADOS = d;
@@ -288,21 +307,75 @@ function sondar(){
   }, 5000);
 }
 
-async function perguntar(q){
+function juntar(classe, conteudo){
+  // appendChild, NUNCA innerHTML += : reescrever o miolo RE-CRIA os <audio>
+  // que ja' estao ali, e a gravacao que estava tocando volta ao comeco.
   const fala = document.getElementById("fala");
-  fala.innerHTML += `<div class="msg eu">${esc(q)}</div>`;
+  const d = document.createElement("div");
+  d.className = classe;
+  if(conteudo instanceof Node) d.appendChild(conteudo); else d.textContent = conteudo;
+  fala.appendChild(d);
   fala.scrollTop = fala.scrollHeight;
+  return d;
+}
+
+async function perguntar(q){
+  juntar("msg eu", q);
   let r;
   if(modo!=="servidor"){
-    r = "modo estático: a conversa precisa do servidor.\n\nrode:\n  python3 servidor/servidor.py\n\ne abra http://127.0.0.1:8787/";
+    r = "modo estático: a conversa precisa do servidor.\n\nrode:\n  python3 servidor/servidor.py\n\ne abra http://127.0.0.1:8791/";
   } else {
     try{
       const resp = await fetch("api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q})});
-      r = (await resp.json()).resposta;
+      const d = await resp.json();
+      r = d.resposta;
+      if(d.modo==="modelo") r = "[modelo de fora — nada aqui passou pelo juiz]\n\n" + r;
     }catch(e){ r="não consegui falar com o servidor: "+e; }
   }
-  fala.innerHTML += `<div class="msg sis pre">${esc(r)}</div>`;
-  fala.scrollTop = fala.scrollHeight;
+  juntar("msg sis pre", r);
+}
+
+async function desenharAcervo(){
+  const alvo = document.getElementById("acervo-corpo");
+  if(!alvo || modo!=="servidor") return;
+  alvo.innerHTML = '<p class="dica">lendo…</p>';
+  try{
+    const e = await (await fetch("api/estado")).json();
+    const m = await (await fetch("api/midias")).json();
+    const g = await (await fetch("api/grafo")).json();
+    let h = `<div class="cards">
+      <div class="card"><b>${e.objetos}</b><span>objetos</span></div>
+      <div class="card"><b>${e.quantos_midia}</b><span>mídias</span></div>
+      <div class="card"><b>${e.quantos_texto}</b><span>textos</span></div>
+      <div class="card"><b>${e.orfaos.length}</b><span>sem alcance</span></div></div>`;
+
+    h += "<h2>o que não é texto</h2>";
+    if(!m.quantas) h += '<p class="dica">nenhuma mídia.</p>';
+    for(const x of m.midias){
+      const quem = x.apontado_por.length ? "apontado por "+x.apontado_por.map(y=>y.slice(0,12)).join(", ") : "NINGUÉM aponta";
+      h += `<div class="obj midia">${esc(x.tipo_de_midia)} · ${x.bytes} bytes · ${esc(x.procedencia)} · ${esc(quem)}
+        <audio controls preload="none" src="bytes/${esc(x.endereco)}"></audio>
+        <div class="dica">${esc(x.endereco)}</div></div>`;
+    }
+
+    h += "<h2>por espécie</h2><table>";
+    for(const k of Object.keys(e.por_especie).sort())
+      h += `<tr><td>${esc(k)}</td><td>${e.por_especie[k]}</td></tr>`;
+    h += "</table>";
+
+    const vivos = g.nos.filter(n=>n.grau_saida>0).sort((a,b)=>b.grau_saida-a.grau_saida).slice(0,10);
+    h += "<h2>os mais citados</h2><table>";
+    for(const n of vivos)
+      h += `<tr><td>${esc(n.endereco.slice(0,12))}…</td><td>${esc(n.nome||n.tipo||"conteúdo")}</td><td>${n.grau_saida}</td></tr>`;
+    h += "</table>";
+
+    if(e.orfaos.length){
+      h += "<h2>sem tipo e sem alcance</h2>";
+      for(const o of e.orfaos)
+        h += `<div class="obj orfa">${esc(o.endereco)}<div class="dica">${o.bytes} bytes · ${esc(o.procedencia)}</div></div>`;
+    }
+    alvo.innerHTML = h;
+  }catch(err){ alvo.innerHTML = '<div class="av">não consegui ler o acervo: '+esc(err.message)+'</div>'; }
 }
 
 function camposDe(){
@@ -352,6 +425,63 @@ document.getElementById("bnotif").onclick = async ()=>{
 render(DADOS);
 conectar();
 perguntar("ajuda");
+
+// --- GRAVAR VOZ COMO ANOTACAO -------------------------------------------
+// O audio NAO e' texto: por isso vai por /bytes/, cru, sem decodificar.
+// O servidor calcula o endereco e grava no acervo PRIVADO.
+let gravador=null, pedacos=[], t0=0;
+const bRec=document.getElementById("bt-gravar");
+const recEst=document.getElementById("rec-estado");
+const dizRec = t => { if(recEst) recEst.textContent = t; };
+
+if(bRec) bRec.onclick = async () => {
+  if(gravador && gravador.state==="recording"){ gravador.stop(); return; }
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    return dizRec("este navegador nao da' acesso ao microfone (a pagina precisa ser SERVIDA, nao aberta como arquivo).");
+  }
+  let fluxo;
+  try { fluxo = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ return dizRec("o microfone foi recusado: "+e.name); }
+  pedacos=[];
+  gravador = new MediaRecorder(fluxo);
+  gravador.ondataavailable = ev => { if(ev.data && ev.data.size) pedacos.push(ev.data); };
+  gravador.onstop = async () => {
+    fluxo.getTracks().forEach(t=>t.stop());
+    bRec.textContent="🎤"; bRec.classList.remove("on");
+    const b = new Blob(pedacos, {type: gravador.mimeType || "audio/webm"});
+    const seg = ((Date.now()-t0)/1000).toFixed(1);
+    dizRec("gravado: "+seg+"s, "+b.size+" bytes — enviando...");
+    try{
+      const r = await fetch("api/gravar", {method:"POST",
+        headers:{"Content-Type":"application/octet-stream"}, body:b});
+      const d = await r.json();
+      if(d.erro) return dizRec("o servidor recusou: "+d.erro);
+      dizRec("");
+      const caixa = document.createElement("div");
+      const a = document.createElement("audio");
+      a.controls = true; a.preload = "none"; a.src = "bytes/"+d.conteudo;
+      caixa.appendChild(a);
+      const leg = document.createElement("div");
+      leg.className = "dica";
+      leg.textContent = seg+"s · "+d.bytes+" bytes · "+d.tipo_de_midia;
+      caixa.appendChild(leg);
+      juntar("msg eu", caixa);
+      juntar("msg sis pre",
+        "guardado em "+d.onde+" (sigilo: "+d.sigilo+").\n"
+        + "conteúdo:  "+d.conteudo+"\n"
+        + "anotação: "+(d.anotacao||"")+"\n\n"
+        + (d.conteudo_novo ? "nasceu agora" : "este áudio JÁ EXISTIA — o mesmo conteúdo tem o mesmo nome, e nada foi reescrito")
+        + ".\nAo cânone é ato separado: nada aqui saiu do lugar privado.");
+    }catch(e){ dizRec("nao consegui falar com o servidor: "+e.message); }
+  };
+  gravador.start();
+  t0=Date.now(); bRec.textContent="■"; bRec.classList.add("on");
+  dizRec("gravando... toque de novo para parar.");
+};
+
+const bAc=document.getElementById("bt-acervo");
+if(bAc) bAc.onclick = desenharAcervo;
+
 </script>
 </body>
 </html>

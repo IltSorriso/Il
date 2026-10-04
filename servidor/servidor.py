@@ -351,6 +351,344 @@ def _assinatura(objs):
     return hashlib.sha256(s.encode()).hexdigest()[:16]
 
 
+def mime_de(dados):
+    """O TIPO, lido dos PROPRIOS BYTES — projecao, nao campo guardado.
+
+    A bolha nao carrega tipo de midia, e nao deve: quem sabe o que um arquivo e'
+    sao os seus primeiros bytes. Guardar o tipo num campo seria segunda fonte, e
+    a segunda fonte diverge. Se um dia o tipo nao se adivinhar aqui, o certo e'
+    melhorar ESTA leitura — nao inventar campo.
+    """
+    if dados[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if dados[:2] == b"\xff\xd8":
+        return "image/jpeg"
+    if dados[:4] == b"RIFF" and dados[8:12] == b"WAVE":
+        return "audio/wav"
+    if dados[:4] == b"OggS":
+        return "audio/ogg"
+    if dados[:4] == b"\x1a\x45\xdf\xa3":
+        return "audio/webm"
+    if dados[4:8] == b"ftyp":
+        return "audio/mp4"
+    if dados[:4] == b"fLaC":
+        return "audio/flac"
+    if dados[:3] == b"ID3":
+        return "audio/mpeg"
+    if dados[:4] == b"%PDF":
+        return "application/pdf"
+    if dados[:2] == b"PK":
+        return "application/zip"
+    return "application/octet-stream"
+
+
+def gravar(raiz, dados):
+    """RECEBE BYTES e os poe no acervo PRIVADO — nunca no canone.
+
+    A interface pode gravar, mas so' para onde e' privado: `deposito/objetos` e'
+    o unico caminho declarado com `sigilo: privado`. O que a tela recebe nasce
+    privado; promover ao canone continua sendo ato separado e deliberado — assim
+    um engano na tela nunca suja o repositorio publico.
+
+    Devolve o endereco do CONTEUDO e o da ANOTACAO que aponta para ele. Nada e'
+    sobrescrito: o endereco E' o sha256 dos bytes, entao gravar duas vezes o
+    mesmo audio da' o mesmo nome, e o segundo ato nao faz nada.
+    """
+    if not dados:
+        return {"erro": "corpo vazio — nada a gravar"}
+    destino = os.path.join(raiz, "deposito/objetos")
+    try:
+        os.makedirs(destino, exist_ok=True)
+    except OSError as erro:
+        return {"erro": "nao consigo escrever no acervo privado: %s" % erro}
+    h = hashlib.sha256(dados).hexdigest()
+    novo = not os.path.exists(os.path.join(destino, h))
+    if novo:
+        with open(os.path.join(destino, h), "wb") as f:
+            f.write(dados)
+    texto = "tipo: anotacao\nconteudo: %s\nlicenca: reservado\n" % h
+    b = texto.encode("utf-8")
+    ha = hashlib.sha256(b).hexdigest()
+    nova = not os.path.exists(os.path.join(destino, ha))
+    if nova:
+        with open(os.path.join(destino, ha), "wb") as f:
+            f.write(b)
+    return {"onde": "deposito/objetos", "sigilo": "privado",
+            "conteudo": h, "conteudo_novo": novo, "bytes": len(dados),
+            "tipo_de_midia": mime_de(dados),
+            "anotacao": ha, "anotacao_nova": nova, "texto": texto,
+            "nota": "nasceu PRIVADO. O canone e' ato separado."}
+
+
+def _hexes(o):
+    """Todo valor de 64 hex que aparece em QUALQUER campo deste objeto."""
+    import re as _re
+    achados = []
+    for _, v in o["campos"].items():
+        for h in _re.findall(r"\b[0-9a-f]{64}\b", v):
+            achados.append(h)
+    return achados
+
+
+def _quem_aponta(objs):
+    """endereco -> [quem cita]. A inversa do grafo, montada uma vez so'."""
+    dentro = {}
+    for o in objs:
+        if not o.get("tipo"):
+            continue
+        for h in _hexes(o):
+            dentro.setdefault(h, []).append(o["endereco"])
+    return dentro
+
+
+def midias(raiz):
+    """AS MIDIAS — o que nao e' texto, com quem aponta para cada uma.
+
+    Nao ha campo de tipo de midia em bolha nenhuma, e nao deve haver: o tipo se
+    le' dos BYTES. Aqui ele e' DITO, como projecao.
+    """
+    objs = objetos(raiz)
+    dentro = _quem_aponta(objs)
+    fora = []
+    for o in objs:
+        if o["eh_texto"]:
+            continue
+        b = ler_bytes(os.path.join(raiz, o["caminho_rel"], o["endereco"])) or b""
+        fora.append({"endereco": o["endereco"], "bytes": o["bytes"],
+                     "tipo_de_midia": mime_de(b),
+                     "procedencia": o["procedencia"],
+                     "apontado_por": sorted(set(dentro.get(o["endereco"], []))),
+                     "rotas": {"bytes": "/bytes/" + o["endereco"]}})
+    fora.sort(key=lambda x: -x["bytes"])
+    return {"ambito": raiz, "quantas": len(fora),
+            "bytes": sum(x["bytes"] for x in fora),
+            "midias": fora,
+            "nota": "o tipo vem dos PRIMEIROS BYTES, lido na hora — nao ha campo guardado"}
+
+
+def _ramos(raiz):
+    """Os ramos que AINDA existem — uma chamada so' de git."""
+    import subprocess as _sp
+    try:
+        r = _sp.run(["git", "branch", "-a", "--format=%(refname:short)"],
+                    cwd=raiz, capture_output=True, text=True, timeout=15)
+    except (OSError, _sp.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    fora = set()
+    for linha in (r.stdout or "").splitlines():
+        n = linha.strip()
+        if n.startswith("origin/"):
+            n = n[len("origin/"):]
+        if n and n != "HEAD":
+            fora.add(n)
+    return fora
+
+
+def _dias_ate(prazo):
+    """Dias entre hoje e AAAA-MM-DD. None se o prazo nao for data valida."""
+    import datetime as _dt
+    try:
+        a, m, d = [int(x) for x in prazo.split("-")]
+        return (_dt.date(a, m, d) - _dt.date.today()).days
+    except (ValueError, AttributeError):
+        return None
+
+
+def _resposta_acervo(raiz, q):
+    """A conversa DETERMINISTICA: le' o deposito e responde FATO.
+
+    Regra: se nao souber, DIZ que nao sabe. Um chat que inventa para parecer
+    util e' pior que um chat que cala — porque o inventado nao se distingue do
+    medido na tela.
+    """
+    objs = objetos(raiz)
+    e = estado(raiz)
+    ql = q.lower().strip()
+    linhas, fontes = [], []
+
+    def comeca(*chaves):
+        return any(c in ql for c in chaves)
+
+    if not ql or comeca("ajuda", "socorro", "o que voce", "o que vc", "comandos", "?"):
+        return ("sei responder, lendo o acervo e sem inventar:\n"
+                "  quantos            — objetos por procedencia e por especie\n"
+                "  prazos             — as declaracoes e quanto falta\n"
+                "  especies           — as formas e quantos campos cada uma tem\n"
+                "  caminhos           — onde o acervo mora, e o sigilo de cada lugar\n"
+                "  midias             — o que nao e' texto (audio, imagem)\n"
+                "  carimbos           — quando cada coisa existiu no mundo\n"
+                "  orfaos             — o que ninguem alcanca\n"
+                "  quem aponta <end>  — quem cita aquele endereco\n"
+                "  buscar <termo>     — procura o termo nos textos\n"
+                "\nnada disso sai da maquina, e nada disso e' probabilidade.")
+
+    if comeca("quantos", "quantas", "quantidade", "total"):
+        p = e["por_procedencia"]
+        linhas.append("o acervo tem %d objetos, %s bytes." % (e["objetos"],
+                      format(e["bytes"], ",d").replace(",", " ")))
+        linhas.append("por origem: " + " · ".join("%s %d" % (k, v) for k, v in sorted(p.items())))
+        esp = sorted(e["por_especie"].items(), key=lambda x: -x[1])
+        linhas.append("por especie: " + " · ".join("%s %d" % (k, v) for k, v in esp if k != "SEM TIPO"))
+        if e["por_especie"].get("SEM TIPO"):
+            linhas.append("sem tipo (conteudo): %d" % e["por_especie"]["SEM TIPO"])
+        return "\n".join(linhas)
+
+    if comeca("prazo", "vence", "vencimento", "atrasad"):
+        d = [o for o in objs if o.get("tipo") == "declaracao"]
+        if not d:
+            return "nao ha declaracao nenhuma neste ambito."
+        vivos = _ramos(raiz)
+        linhas.append("as declaracoes — sao elas que carregam prazo:")
+        for o in sorted(d, key=lambda x: x["campos"].get("prazo") or "9999"):
+            pz = o["campos"].get("prazo") or "?"
+            dias = _dias_ate(pz)
+            if dias is None:
+                estado_txt = "MALFORMADO — nao e' data"
+            elif dias < 0:
+                estado_txt = "VENCEU ha %d dia(s)" % (-dias)
+            elif dias <= 7:
+                estado_txt = "vence em %d dia(s)" % dias
+            else:
+                estado_txt = "faltam %d dias" % dias
+            ramo = o["campos"].get("ramo") or "?"
+            # O prazo de um ramo que JA' NAO EXISTE nao corre: o trabalho ou foi
+            # fundido ou foi abandonado, e dizer "venceu" seria mentira util.
+            if vivos is not None and ramo not in vivos:
+                if dias is None:
+                    estado_txt += " · ramo nao existe mais"
+                else:
+                    estado_txt = "ramo nao existe mais (fundido ou abandonado)"
+            linhas.append("  %s  %-34s %s" % (pz, ramo, estado_txt))
+            fontes.append(o["endereco"])
+        return "\n".join(linhas)
+
+    if comeca("especie", "espécie", "formas", "formulario", "formulário"):
+        esp = especies(objs)
+        linhas.append("%d especies, e a forma de cada uma vem do proprio dado:" % len(esp))
+        for n in sorted(esp):
+            linhas.append("  %-14s %s" % (n, " + ".join(esp[n]["campos"])))
+        linhas.append("\n(um campo terminando em * carrega um ENDERECO — e' ponteiro, nao texto)")
+        return "\n".join(linhas)
+
+    if comeca("caminho", "onde mora", "deposito", "depósito", "sigilo"):
+        c = e["caminhos"]
+        linhas.append("os lugares declarados, e o sigilo de cada um:")
+        for k, v in sorted(c.items()):
+            linhas.append("  %-32s %s" % (k, v))
+        return "\n".join(linhas)
+
+    if comeca("midia", "mídia", "audio", "áudio", "som", "gravac", "gravaç", "imagem", "video", "vídeo"):
+        m = midias(raiz)
+        if not m["quantas"]:
+            return "nenhuma midia no acervo. (o que nao e' texto aparece aqui)"
+        linhas.append("%d midias, %d bytes:" % (m["quantas"], m["bytes"]))
+        for x in m["midias"]:
+            quem = ", ".join(y[:12] for y in x["apontado_por"]) or "NINGUEM aponta"
+            linhas.append("  %s…  %8d B  %-16s  %s  %s"
+                          % (x["endereco"][:12], x["bytes"], x["tipo_de_midia"],
+                             x["procedencia"], quem))
+        linhas.append("\n(abra /bytes/<endereco> para ouvir ou ver)")
+        return "\n".join(linhas)
+
+    if comeca("carimbo", "quando"):
+        d = [o for o in objs if o.get("tipo") == "carimbo"]
+        if not d:
+            return "nenhum carimbo: o tempo do mundo ainda nao foi registrado para nada."
+        linhas.append("%d carimbos — o tempo do MUNDO, que o git nao sabe:" % len(d))
+        for o in d:
+            t = o["campos"].get("tempo") or "?"
+            import time as _t
+            try:
+                legivel = _t.strftime("%Y-%m-%d %H:%M UTC", _t.gmtime(int(t)))
+            except (ValueError, OverflowError, TypeError):
+                legivel = "?"
+            linhas.append("  %s  carimba %s" % (legivel, (o["campos"].get("objeto") or "?")[:12]))
+        return "\n".join(linhas)
+
+    if comeca("orf", "ninguem alcanca", "ninguém alcança", "artefat"):
+        if not e["orfaos"]:
+            return "nenhum orfao: todo objeto sem tipo tem quem o alcance."
+        linhas.append("%d orfao(s) — sem tipo e sem alcance:" % len(e["orfaos"]))
+        for o in e["orfaos"]:
+            linhas.append("  %s  %s bytes  %s" % (o["endereco"][:12], o["bytes"], o["procedencia"]))
+        return "\n".join(linhas)
+
+    import re as _re
+    m = _re.search(r"\b([0-9a-f]{6,64})\b", ql)
+    if ("quem" in ql or "aponta" in ql or "cita" in ql or "referencia" in ql) and m:
+        alvo = m.group(1)
+        achou = [o for o in objs if o["endereco"].startswith(alvo)]
+        if not achou:
+            return "nenhum objeto comeca com %s neste ambito." % alvo
+        dentro = _quem_aponta(objs)
+        quem = dentro.get(achou[0]["endereco"], [])
+        if not quem:
+            return "%s — NINGUEM aponta para ele." % achou[0]["endereco"]
+        return "%s e' apontado por:\n" % achou[0]["endereco"] + "\n".join(
+            "  " + x for x in sorted(set(quem)))
+
+    termo = ql
+    for p0 in ("buscar", "busca", "procur", "procure", "onde esta", "onde est"):
+        if termo.startswith(p0):
+            termo = termo[len(p0):].strip()
+    if len(termo) >= 3:
+        achados = []
+        for o in objs:
+            alvo = (o["texto"] or "").lower()
+            if termo in alvo or termo in (o.get("nome") or "").lower():
+                achados.append(o)
+        if achados:
+            linhas.append('\"%s\" aparece em %d objeto(s):' % (termo, len(achados)))
+            for o in achados[:12]:
+                nome = o.get("nome") or o.get("tipo") or "conteudo"
+                linhas.append("  %s…  %-16s %s" % (o["endereco"][:12], nome, o["procedencia"]))
+            if len(achados) > 12:
+                linhas.append("  ... e %d outros" % (len(achados) - 12))
+            return "\n".join(linhas)
+        return ("nao achei \"%s\" em nenhum objeto deste ambito.\n\n"
+                "posso ter errado: tente uma palavra mais curta, ou \"ajuda\" para ver "
+                "o que eu sei responder." % termo)
+
+    return ("nao sei responder isso lendo o acervo — e nao vou inventar.\n\n"
+            "escreva \"ajuda\" para ver o que eu sei. Se quiser perguntar a um MODELO, "
+            "e' outro ato: ele manda a pergunta para fora da maquina.")
+
+
+def conversar(raiz, pergunta, modo="acervo"):
+    """A conversa. Duas naturezas, e a resposta DIZ qual foi usada.
+
+    `acervo` (padrao): le' o deposito, responde FATO, nada sai da maquina.
+    `modelo`: manda a pergunta para FORA e devolve o que voltar. Nao e' o
+      acervo falando — e' um modelo opinando, e a resposta nao finge o contrario.
+    """
+    if modo != "modelo":
+        return {"modo": "acervo", "saiu_da_maquina": False,
+                "resposta": _resposta_acervo(raiz, pergunta), "fontes": []}
+    if not pergunta:
+        return {"modo": "modelo", "saiu_da_maquina": False,
+                "resposta": "pergunta vazia."}
+    import subprocess as _sp
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "cli", "modelo")
+    if not os.path.exists(script):
+        return {"modo": "modelo", "saiu_da_maquina": False,
+                "resposta": "o modulo cli/modelo nao esta' aqui."}
+    try:
+        r = _sp.run(["python3", script, pergunta], capture_output=True, text=True, timeout=90)
+    except _sp.TimeoutExpired:
+        return {"modo": "modelo", "saiu_da_maquina": True, "resposta": "o modelo nao respondeu em 90 s."}
+    except OSError as erro:
+        return {"modo": "modelo", "saiu_da_maquina": False, "resposta": "nao consegui chamar: %s" % erro}
+    if r.returncode != 0:
+        return {"modo": "modelo", "saiu_da_maquina": True,
+                "resposta": "o modelo recusou (codigo %d):\n%s" % (r.returncode, (r.stderr or "")[:400])}
+    return {"modo": "modelo", "saiu_da_maquina": True,
+            "resposta": (r.stdout or "").strip(),
+            "aviso": "isto NAO e' o acervo: e' um modelo de fora. Nada aqui foi conferido pelo juiz."}
+
+
 def compor(raiz, especie, valores):
     """COMPOE a partir da especie e devolve o ENDERECO — sem gravar nada.
 
@@ -490,6 +828,14 @@ class Mao(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def corpo_bytes(self):
+        """CORPO CRU, sem decodificar — e' por aqui que a midia entra."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            return self.rfile.read(n) if n else b""
+        except Exception:
+            return b""
+
     # --- leitura ---------------------------------------------------------
     def do_GET(self):
         p = urlparse(self.path).path
@@ -564,6 +910,8 @@ class Mao(BaseHTTPRequestHandler):
                     return self.responder({"erro": "especie desconhecida", "especie": args[0],
                                            "conhecidas": sorted(f)}, 404)
                 return self.responder({"ambito": raiz, "especie": args[0], "forma": f[args[0]]})
+            if verbo == "midias" and not args:
+                return self.responder(midias(raiz))
             if verbo == "grafo" and not args:
                 return self.responder(grafo(raiz))
             if verbo == "painel":
@@ -595,7 +943,7 @@ class Mao(BaseHTTPRequestHandler):
                 b = ler_bytes(os.path.join(raiz, o["caminho_rel"], o["endereco"]))
                 if b is None:
                     return self.responder({"erro": "nao consegui ler os bytes"}, 500)
-                return self.bruto(200, "application/octet-stream", b)
+                return self.bruto(200, mime_de(b), b)
             if verbo == "recorte" and len(args) == 1:
                 r = recorte(raiz, args[0])
                 if r is None:
@@ -622,6 +970,12 @@ class Mao(BaseHTTPRequestHandler):
             alvo, resto = (A.get(partes[0]), partes[1:]) if partes else (None, [])
         if alvo is None:
             return self.responder({"erro": "ambito desconhecido"}, 404)
+        if resto and resto[0] == "chat":
+            b = self.corpo()
+            return self.responder(conversar(alvo, (b.get("q") or "").strip(),
+                                            b.get("modo") or "acervo"))
+        if resto and resto[0] == "gravar":
+            return self.responder(gravar(alvo, self.corpo_bytes()))
         b = self.corpo()
         if resto and resto[0] == "compor":
             return self.responder(compor(alvo, b.get("especie", ""), b.get("valores") or {}))
