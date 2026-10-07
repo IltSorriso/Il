@@ -142,10 +142,12 @@ cada pergunta vira um objeto no acervo: a conversa fica gravada, e não se perde
   <section id="s-paineis">
     <p class="dica">tudo aqui é SAÍDA: calculado na hora a partir do depósito (e, no caso do
     tempo, do próprio git). Nada é guardado — por isso nada apodrece.</p>
+    <div id="quem-fala"></div>
     <div class="cards" id="cards"></div>
     <h2>por espécie</h2><table id="t-especie"></table>
     <h2>prazos declarados</h2><table id="t-prazo"></table>
     <h2>depósitos que o acervo declara a si mesmo</h2><table id="t-caminho"></table>
+    <h2>a lei do recipiente</h2><div id="lei-do-recipiente"></div>
     <h2>itinerário</h2><div id="itinerario"></div>
     <h2>licenças — como o acervo cresce</h2>
     <p class="dica">a licença é a coluna que diz sob que termos cada objeto vive — e agora
@@ -309,6 +311,26 @@ function render(d){
     c += `<tr><td>${esc(x.nome)}</td><td class="m">${esc(x.padrao)}</td><td>${x.sigilo?`<span class="tag">${esc(x.sigilo)}</span>`:'<span class="m">campo não existe</span>'}</td></tr>`;
   });
   document.getElementById("t-caminho").innerHTML = c;
+
+  const ax = d.ambito_declarado;
+  document.getElementById("quem-fala").innerHTML = ax
+    ? `<p class="dica">este acervo é o âmbito <b>${esc(ax.nome||"?")}</b>`
+      + `, e quem responde por ele é <b>${esc(ax.dono||"(sem dono declarado)")}</b>`
+      + (ax.procedencia?` · procedência: ${esc(ax.procedencia)}`:"")
+      + `</p>`
+    : `<p class="dica m">este acervo NÃO declara a si mesmo como âmbito —`
+      + ` nenhuma bolha <code>ambito</code> aponta para ele. O serviço diz isso`
+      + ` em voz alta em vez de inventar um dono.</p>`;
+
+  // A LEI DO RECIPIENTE, LIDA: o que sai daqui tem para onde apontar?
+  const dx = Array.isArray(d.destinos_externos)?d.destinos_externos:[];
+  document.getElementById("lei-do-recipiente").innerHTML = dx.length
+    ? `<p>este âmbito <b>declara ${dx.length} destino(s) de fora</b>: `
+      + dx.map(x=>`<code>${esc(x.nome)}</code> (sigilo: <span class="tag">${esc(x.sigilo)}</span>)`).join(", ")
+      + `.</p><p class="m">o que sai daqui tem para onde apontar — e o sigilo de lá`
+      + ` diz se protege. O destino <b>não</b> está escrito no código: ele é lido desta bolha.</p>`
+    : `<p class="m">nenhuma bolha deste âmbito declara destino externo. Se algo`
+      + ` daqui for enviado a um recipiente de fora, <b>sai sem lei que olhe para isso</b>.</p>`;
 
   const it = d.itinerario;
   document.getElementById("itinerario").innerHTML = it

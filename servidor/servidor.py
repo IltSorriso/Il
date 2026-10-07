@@ -405,6 +405,8 @@ def retrato(raiz):
             "total": len(objs), "bytes": sum(o["bytes"] for o in objs),
             "por_especie": por_especie, "por_deposito": por_deposito,
             "licencas": licencas, "declaracoes": declaracoes, "caminhos": caminhos,
+            # LIDO, nao afirmado: quais lugares declarados NAO sao diretorios daqui.
+            "destinos_externos": destinos_do_ambito(raiz, objs),
             "especies": {k: {"campos": v["campos"], "licenca_exigida": v["licenca_exigida"],
                              "conteudo": v["conteudo"]}
                          for k, v in especies(objs).items()}}
@@ -1235,6 +1237,23 @@ def caminhos_externos(raiz, objs=None):
                          "sigilo": o["campos"].get("sigilo"),
                          "endereco": o["endereco"]})
     return fora
+def destinos_do_ambito(raiz, objs=None):
+    """Os destinos de FORA que ESTE ambito declara entre os seus caminhos.
+
+    A conta morava em DOIS lugares: `estado()` varria TODOS os caminhos do
+    deposito e `recorte()` cruzava com os do ambito. Duas contas da mesma coisa
+    divergem — e' a classe do `cli/il` escrevendo as quatro camadas, e do
+    `cli/alertas` fixando o nome `pindorama`.
+
+    Aqui e' UMA: o ambito declara os lugares que usa; destes, os que nao sao
+    diretorio desta raiz sao destino de fora. Nada afirmado sem olhar.
+    """
+    objs = objs if objs is not None else objetos(raiz)
+    nome = nomeDoAmbito(raiz)
+    dec = declaracaoDoAmbito(raiz, nome) if nome else None
+    padroes = set(c.get("padrao") for c in (dec.get("caminhos") or [])) if dec else set()
+    return [e for e in caminhos_externos(raiz, objs) if e.get("padrao") in padroes]
+
 def recorte(raiz, nome):
     """A META-JANELA-MODULAR, montada e DITA. Nada e' enviado; nada e' gravado."""
     objs = objetos(raiz)
@@ -1273,12 +1292,7 @@ def recorte(raiz, nome):
     # A LEI DO RECIPIENTE: LIDA, nao afirmada. O ambito declara os lugares que
     # usa; um deles nao e' diretorio daqui — e' destino de fora.
     amb_nome = nomeDoAmbito(raiz)
-    dec = declaracaoDoAmbito(raiz, amb_nome) if amb_nome else None
-    ext = caminhos_externos(raiz, objs)
-    do_ambito = []
-    if dec:
-        padroes = set(c.get("padrao") for c in (dec.get("caminhos") or []))
-        do_ambito = [e for e in ext if e.get("padrao") in padroes]
+    do_ambito = destinos_do_ambito(raiz, objs)
     privados = [p for p in pedacos if p.get("morada") == "privado"]
     ausentes = [p for p in pedacos if not p.get("presente")]
     sem_sig = [p for p in pedacos if p.get("morada") == "NAO DECLARADO"]
