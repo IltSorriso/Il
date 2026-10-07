@@ -64,6 +64,55 @@ def ambitos():
     return mapa
 
 
+def bolhasDeAmbito(raiz):
+    """Le' o deposito UMA vez e devolve o que a bolha DECLARA.
+
+    Duas naturezas, e a distincao e' o ponto:
+      - o AMBITO e' de QUEM   — nome, dono, e os caminhos que ele usa;
+      - o CAMINHO e' ONDE     — com o proprio sigilo ("o RECIPIENTE DECIDE").
+    O servidor passa a LE' a bolha em vez de confiar so' na variavel de
+    ambiente. A variavel diz ONDE esta' nesta maquina; a bolha diz QUEM
+    responde e QUAIS lugares o ambito usa. Quando as duas discordam, o errado
+    e' o ambiente — entao o servidor DIZ, e nao corrige em silencio.
+    """
+    amb, cam = {}, {}
+    for o in objetos(raiz):
+        c = o["campos"]
+        if o.get("tipo") == "caminho":
+            cam[o["endereco"]] = {"nome": c.get("nome"), "padrao": c.get("padrao"),
+                                  "sigilo": c.get("sigilo")}
+        elif o.get("tipo") == "ambito":
+            amb[c.get("nome")] = {
+                "endereco": o["endereco"], "dono": c.get("dono"),
+                "licenca": c.get("licenca"), "procedencia": o["procedencia"],
+                "enderecos": [x for x in (c.get("caminhos") or "").split(",")
+                              if len(x) == 64]}
+    return amb, cam
+
+
+def declaracaoDoAmbito(raiz, nome):
+    """O ambito DECLARADO em bolha — ou None. None NAO e' erro: e' a resposta
+    honesta para um ambito que so' existe no ambiente e em bolha nenhuma."""
+    if not nome:
+        return None
+    amb, cam = bolhasDeAmbito(raiz)
+    a = amb.get(nome)
+    if not a:
+        return None
+    a = dict(a)
+    a["nome"] = nome
+    a["caminhos"] = [cam[x] for x in a.pop("enderecos") if x in cam]
+    return a
+
+
+def nomeDoAmbito(raiz):
+    """O nome pelo qual ESTA raiz e' servida — a volta da tabela do ambiente."""
+    for n, c in ambitos().items():
+        if os.path.abspath(c) == os.path.abspath(raiz):
+            return n
+    return None
+
+
 def ler_texto(p):
     """A VISTA de texto. Objeto que nao e' texto nao e' bolha — bolha se le'.
 
@@ -334,7 +383,12 @@ def retrato(raiz):
                              "padrao": c.get("padrao", ""), "sigilo": c.get("sigilo"),
                              "licenca": c.get("licenca", "")})
     declaracoes.sort(key=lambda d: (d["prazo"] or "9999-99-99"))
-    return {"ambito": raiz, "quando": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    # QUEM, nao so' ONDE — e AQUI, porque a raiz do servidor (`/`) serve a
+    # PAGINA, nao JSON: aquele ramo que lista as rotas so' responde a caminho
+    # vazio, e portanto nunca executa. A declaracao mora onde a pagina a ve'.
+    return {"ambito": raiz, "ambito_nome": nomeDoAmbito(raiz),
+            "ambito_declarado": declaracaoDoAmbito(raiz, nomeDoAmbito(raiz)),
+            "quando": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "assinatura": _assinatura(objs),
             "total": len(objs), "bytes": sum(o["bytes"] for o in objs),
             "por_especie": por_especie, "por_deposito": por_deposito,
@@ -1281,7 +1335,14 @@ class Mao(BaseHTTPRequestHandler):
 
     def rota(self, raiz, resto):
         if not resto:
-            return self.responder({"ambito": raiz,
+            # QUEM, nao so' ONDE. O nome vem da volta da tabela do ambiente; a
+            # declaracao vem da bolha. `declarado: False` e' achado, nao falha:
+            # significa que este ambito existe so' no ambiente.
+            _nome = nomeDoAmbito(raiz)
+            _dec = declaracaoDoAmbito(raiz, _nome)
+            return self.responder({"ambito": raiz, "ambito_nome": _nome,
+                                   "declarado": _dec is not None,
+                                   "declaracao": _dec,
                                    "rotas": ["estado", "diagnostico", "formulario", "grafo", "painel[/tempo|peso|forma|alcance|licencas]",
                                              "bytes/<e>", "objeto/<e>", "agentes",
                                              "recorte/<agente>", "verificar", "alertas",
