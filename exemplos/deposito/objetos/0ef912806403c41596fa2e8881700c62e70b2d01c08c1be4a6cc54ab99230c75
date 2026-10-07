@@ -1,0 +1,48 @@
+encerramento: be044d331984911d3620b7c5996006f74052454fdfacc06fd8260e04ffafe3ea
+
+A5 be044d33 — spec/vocabulario-em-bolha, prazo 2026-10-24 — ENCERRADA.
+O ramo foi fundido em 21 de setembro; este veredito e' sobre a PERGUNTA, e o git nao
+podia dar esse veredito.
+
+A PERGUNTA. O vocabulario do juiz vira bolha? Ele e' declarado DUAS vezes: a bolha
+`vocabulario` no deposito, e o `registroEspecies` em Lean.
+
+O QUE FOI MEDIDO, em 7 de outubro de 2026:
+  a bolha vocabulario (6ee1ae36be9d, nome il) declara 13 especies;
+  o registroEspecies em Lean declara as MESMAS 13;
+  os campos sao IDENTICOS em todas as treze;
+  os nomes de campo repetidos em Lean sao 61, em 1855 bytes.
+A conferencia "O VOCABULARIO LIDO CONCORDA COM O REGISTRO LITERAL?" morde e responde
+`identico (N campos)` para cada uma das treze. Nao ha divergencia nenhuma.
+
+O PRECO, medido nas duas operacoes que importam:
+  acrescentar ESPECIE — uma linha no registro literal, mais RECOMPILAR. Foi o que a
+    especie `lista` custou.
+  acrescentar PROPRIEDADE — mexer nos DOIS: na lista `campos` da bolha e na linha do
+    Lean. Foi o que o `sigilo` no `caminho` custou.
+
+O CRITERIO DE DESCARTE DA PROPRIA A5 dizia: se o vocabulario em bolha exigir, para
+funcionar, que o leitor mude a cada especie nova, entao o ganho era ilusorio e o ramo
+morre. A CONDICAO E' VERDADEIRA — o leitor muda mesmo. A CONCLUSAO NAO DECORRE, e a
+razao e' uma so.
+
+  O LEAN NAO CONSEGUE LER A BOLHA EM TEMPO DE COMPILACAO.
+
+O registroEspecies e' uma lista de COMPILACAO, e validar uma especie contra os seus
+campos e' verificacao de tipo. Ler os campos do deposito em tempo de execucao trocaria
+o teorema pela ausencia da duplicacao — e essa e' a unica troca que este projeto
+recusa em toda parte.
+
+LOGO: a duplicacao nao e' descuido, e' o PRECO DO TEOREMA. O que impede as duas fontes
+de divergirem nao e' a ausencia da segunda — e' a conferencia que as compara, e ela
+morde, nas treze.
+
+O QUE ISTO SUPERA. O texto b7e5bee786de, o registro de encerramento de 21 de setembro,
+traz no seu ultimo paragrafo esta A5 declarada NAO ENCERRADA e de proposito sem linha
+de encerramento. Aquele paragrafo esta' SUPERADO por este texto. O texto antigo NAO e'
+reescrito, e por isso o endereco dele continua resolvendo: acrescentar e' o que este
+projeto faz, editar nao e'.
+
+REABRIR TEM PRECO DECLARADO. Atacar a duplicacao exige tirar os campos do tempo de
+compilacao — isto e', abrir mao de parte do que o juiz prova. Quem quiser isso abre A5
+propria, com ramo vivo e prazo.
