@@ -31,10 +31,78 @@ com_json = "--json" in sys.argv[1:]
 argumentos = [a for a in sys.argv[1:] if a != "--json"]
 texto = " ".join(argumentos) if argumentos else sys.stdin.read()
 modelo = os.environ.get("IL_MODELO", "deepseek-chat")
+
+# O DESTINO E' LIDO DO DEPOSITO — nao escrito aqui.
+# "O RECIPIENTE DECIDE" (Bolha.md:598). Mas o recipiente so' decide se ESTIVER
+# DECLARADO: um destino que existe apenas como string no codigo nao decide nada,
+# ele apenas acontece. E a lei do juiz ("bolha privada nao mora em caminho
+# publico") so' alcanca os depositos VARRIDOS — o ENVIO nunca foi alcancado,
+# porque nao havia lugar nenhum para o envio apontar.
+DEPOSITOS = [os.path.join(raiz, "exemplos", "deposito", "objetos"),
+             os.path.join(raiz, "deposito", "objetos")]
+
+def _campos(t):
+    c = {}
+    for l in t.split("\n"):
+        if ": " in l:
+            k, v = l.split(": ", 1)
+            c[k.strip()] = v.strip()
+    return c
+
+def caminhos():
+    """Os lugares declarados em bolha `caminho` — indexados pelo `padrao`."""
+    achados = {}
+    for d in DEPOSITOS:
+        if not os.path.isdir(d):
+            continue
+        for n in sorted(os.listdir(d)):
+            try:
+                t = open(os.path.join(d, n), "rb").read().decode("utf-8")
+            except Exception:
+                continue
+            if not t.startswith("tipo: caminho"):
+                continue
+            c = _campos(t)
+            achados[c.get("padrao", "")] = c
+    return achados
+
+def _privados():
+    """Os enderecos de morada PRIVADA. Hoje: o que mora em deposito/objetos."""
+    p = set()
+    d = os.path.join(raiz, "deposito", "objetos")
+    if os.path.isdir(d):
+        for n in os.listdir(d):
+            p.add(n)
+    return p
+
+# O formato da bolha NAO admite dois-pontos em valor (parseLinha corta por ":" e
+# exige duas partes) — entao o ESQUEMA e' a unica parte do lugar que o formato
+# nao deixa guardar, e ela volta aqui, dita em voz alta, em vez de escondida.
+ESQUEMA = "https://"
+LUGAR = "api.deepseek.com/chat/completions"
+DESTINO = ESQUEMA + LUGAR
+lugar = caminhos().get(LUGAR)
+if not lugar:
+    sys.stderr.write("RECUSO: o destino nao esta' declarado em bolha `caminho`.\n"
+                     "  %s\n" % DESTINO)
+    sys.stderr.write("  O recipiente decide — mas so' decide se estiver declarado.\n")
+    sys.exit(5)
+
+# A LEI, na OPERACAO. O texto que sai nao pode carregar endereco de objeto
+# cuja morada e' privada. Isto e' o que o juiz confere sobre os DEPOSITOS;
+# aqui e' o mesmo veredito sobre o que SAI.
+_pegos = sorted([h for h in _privados() if h in texto])
+if _pegos:
+    sys.stderr.write("RECUSO: o texto carrega %d endereco(s) de morada PRIVADA.\n" % len(_pegos))
+    for h in _pegos[:5]:
+        sys.stderr.write("  %s…\n" % h[:12])
+    sys.stderr.write("  eles moram em deposito/objetos (sigilo: privado). O destino\n")
+    sys.stderr.write("  `%s` declara `sigilo: %s`.\n" % (lugar.get("nome"), lugar.get("sigilo")))
+    sys.exit(6)
 corpo = json.dumps({"model": modelo,
                     "messages": [{"role": "user", "content": texto}],
                     "temperature": 0, "max_tokens": 400}).encode()
-req = urllib.request.Request("https://api.deepseek.com/chat/completions", data=corpo,
+req = urllib.request.Request(DESTINO, data=corpo,
     headers={"Content-Type": "application/json", "Authorization": "Bearer " + k})
 try:
     with urllib.request.urlopen(req, timeout=60) as r:

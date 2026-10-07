@@ -156,7 +156,7 @@ def main : IO UInt32 := do
             let sig := match objetoTexto objs lic with
               | some lt => (campo (parseCampos lt) "sigilo").getD "(sem sigilo)"
               | none    => "(licenca ausente neste deposito)"
-            if sc == "publico" && sig == "privado" then
+            if (sc == "publico" || sc == "terceiro") && sig == "privado" then
               if caminho == caminhoQueb then
                 IO.println s!"    {h.take 12}… o fixture quebrado FOI recusado pela lei (privada em caminho publico)"
               else

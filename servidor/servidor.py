@@ -253,6 +253,18 @@ def sigilo_dos_caminhos(objs):
     return d
 
 
+
+def morada(raiz, padrao):
+    """O sigilo do LUGAR, lido da bolha `caminho` — nunca repetido como literal.
+
+    A bolha `deposito` diz `sigilo: privado`. Escrever "privado" aqui seria uma
+    SEGUNDA FONTE: se alguem mudasse a bolha, o codigo continuaria afirmando o
+    antigo. E' a mesma classe do `cli/il` que escrevia as quatro camadas, e do
+    recorte que nao distinguia as duas anotacoes.
+    """
+    return sigilo_dos_caminhos(objetos(raiz)).get(padrao, {}).get("sigilo", "NAO DECLARADO")
+
+
 def alcance(objs):
     """Quem aponta quem — e a PROCEDENCIA de quem aponta decide o que o
     apontado E': apontado pelo canone e' conteudo; so' por quebrado e' insumo
@@ -467,7 +479,7 @@ def gravar(raiz, dados):
     if nova:
         with open(os.path.join(destino, ha), "wb") as f:
             f.write(b)
-    return {"onde": "deposito/objetos", "sigilo": "privado",
+    return {"onde": "deposito/objetos", "sigilo": morada(raiz, "deposito/objetos"),
             "conteudo": h, "conteudo_novo": novo, "bytes": len(dados),
             "tipo_de_midia": mime_de(dados),
             "anotacao": ha, "anotacao_nova": nova, "texto": texto,
@@ -502,7 +514,7 @@ def apontar(raiz, alvo):
         return {"erro": "esse objeto nao esta' no acervo privado"}
     texto = "tipo: anotacao\nconteudo: %s\nlicenca: reservado\n" % alvo
     h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
-    return {"onde": "deposito/objetos", "sigilo": "privado",
+    return {"onde": "deposito/objetos", "sigilo": morada(raiz, "deposito/objetos"),
             "aponta_para": alvo, "anotacao": h, "anotacao_nova": novo,
             "nota": "anotacao apontando — nasceu PRIVADA"}
 
@@ -592,7 +604,7 @@ def registrar(raiz, texto, papel="pergunta", licenca=None):
     # epoca e' a mesma unidade que o git usa, entao os dois tempos sao comparaveis.
     tc = "tipo: carimbo\nobjeto: %s\ntempo: %d\nlicenca: reservado\n" % (ha, int(_t.time()))
     hc, novo_c = _por_no_privado(raiz, tc.encode("utf-8"))
-    return {"onde": "deposito/objetos", "sigilo": "privado", "papel": papel,
+    return {"onde": "deposito/objetos", "sigilo": morada(raiz, "deposito/objetos"), "papel": papel,
             "licenca": lic, "selo_de_modelo": lic != "reservado",
             "conteudo": h, "conteudo_novo": novo, "bytes": len(texto.encode("utf-8")),
             "anotacao": ha, "anotacao_nova": nova,
@@ -679,7 +691,7 @@ def criarLista(raiz, nome, enderecos):
     texto = ("tipo: lista\nnome: %s\npartes: %s\nlicenca: reservado\n"
              % (nome, ",".join(itens)))
     h, novo = _por_no_privado(raiz, texto.encode("utf-8"))
-    return {"onde": "deposito/objetos", "sigilo": "privado", "lista": h,
+    return {"onde": "deposito/objetos", "sigilo": morada(raiz, "deposito/objetos"), "lista": h,
             "lista_nova": novo, "nome": nome, "itens": len(itens),
             "vazia": nome == "",
             "nota": ("lista sem nome: e' a caixa para organizar depois."
