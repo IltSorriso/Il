@@ -539,6 +539,15 @@ def registroEspecies : List (String × List String) :=
     -- para organizar depois. `partes` e' reusado, entao o juiz ja' confere a
     -- reuniao sem uma linha nova de verificacao.
     ("lista",        ["tipo", "nome", "partes", "licenca"]),
+    -- O ÂMBITO: a resposta a "isto vale para quem". Ele NÃO é um LUGAR — o
+    -- lugar é o `caminho`, que já declara o próprio sigilo ("o RECIPIENTE
+    -- DECIDE"). O âmbito é de QUEM, e aponta para os caminhos que usa: os dois
+    -- são ortogonais, e o mesmo âmbito pode ter vários caminhos. `dono` é o
+    -- único campo novo — o nome de quem responde por ele. Não vira espécie de
+    -- pessoa ainda: inventar o vocabulário de usuário antes de saber o que uma
+    -- pessoa É seria inventar vocabulário, que é o defeito que esta tabela
+    -- existe para não cometer.
+    ("ambito",       ["tipo", "nome", "dono", "caminhos", "licenca"]),
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.
