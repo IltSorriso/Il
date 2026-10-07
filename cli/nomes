@@ -14,21 +14,44 @@ O CACHE E' ENDERECADO POR CONTEUDO: a chave e' o endereco do objeto. Se o
 conteudo muda, o endereco muda, e o apelido velho simplesmente nao e' achado.
 Nao ha apelido para apodrecer.
 """
-import datetime, json, os, subprocess, sys
+import datetime, json, os, re, subprocess, sys
 raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEP = os.path.join(raiz, "exemplos", "deposito", "objetos")
 QUEB = os.path.join(raiz, "exemplos", "quebrados", "objetos")
 CACHE = os.path.join(raiz, ".nomes-temporarios")
 
 def campos(p):
+    """Os campos de uma BOLHA. CONTEUDO nao tem campos — tem bytes.
+
+    O limiar e' o que o proprio projeto define: objeto cuja PRIMEIRA linha e'
+    `tipo: ` e' BOLHA; objeto sem isso e' CONTEUDO. Medido 07/10/2026: 70/70 das
+    bolhas do canone e 6/6 das quebradas tem `tipo:` na primeira linha.
+
+    POR QUE ISSO IMPORTA. Antes desta correcao, QUALQUER linha com ": " virava
+    campo — inclusive dentro de PROSA. O texto canonico `63faceec` (o que explica
+    a lei do recipiente) tem a linha "nome: exemplos    padrao: .../objetos" no
+    MEIO do texto, e passou a ter campos "A pergunta", "A proposta", "Custo
+    medido" — e um campo `nome` que NAO EXISTE. Consequencias medidas:
+      - `nivel()` achava "nome" no dict e respondia "nomeado" para um objeto SEM
+        NOME PROPRIO, em vez de "SEM NOME PROPRIO — apelido provisorio";
+      - a linha impressa mostrava PEDACO DO PROPRIO TEXTO como se fosse nome.
+    E' a mesma classe de defeito do guarda que confundia Il com IltS: um leitor
+    que nao distingue as duas coisas que precisa distinguir.
+    """
     d = {}
     try:
-        for l in open(p, encoding="utf-8"):
-            if ": " in l[:200]:
-                k, v = l.split(": ", 1)
-                d.setdefault(k.strip(), v.strip())
-    except Exception: pass
+        linhas = open(p, encoding="utf-8", errors="replace").read().split("\n")
+    except OSError:
+        return d
+    if not linhas or not linhas[0].startswith("tipo: "):
+        return d
+    for l in linhas:
+        if ": " in l[:200]:
+            k, v = l.split(": ", 1)
+            d.setdefault(k.strip(), v.strip())
     return d
+
+
 
 def objetos():
     for pasta, prov in ((DEP, "canon"), (QUEB, "quebrado")):
@@ -74,21 +97,152 @@ def nivel(c, prov, h):
     if "nome" not in c:    return 2, "SEM NOME PROPRIO — apelido provisorio"
     return 1, "nomeado"
 
-def meta_janela(h, f, c, prov, alcancado_por):
+def legivel_licenca(lic):
+    """A licenca em forma LEGIVEL — porque a licenca e' o que DISTINGUE.
+
+    `reservado` NAO e' bolha: e' estado, e o projeto ja' diz o que ele significa —
+    ausencia deliberada de licenca, que NAO afirma visibilidade. Escrever o
+    endereco nu de 64 caracteres nao diria nada ao modelo; escrever "publico"
+    seria MENTIR. Entao le' a bolha de licenca quando ela esta' no acervo, e
+    quando o campo e' `reservado` diz o que isso significa.
+    """
+    if not lic:
+        return ""
+    if lic == "reservado":
+        return "reservado (ausencia deliberada de licenca — NAO afirma visibilidade)"
+    if len(lic) == 64:
+        for pasta in (DEP, QUEB):
+            g = os.path.join(pasta, lic)
+            if os.path.isfile(g):
+                lc = campos(g)
+                return "%s (catalogo: %s, nome: %s, sigilo: %s)" % (
+                    lic[:12], lc.get("catalogo", "?"), lc.get("nome", "?"),
+                    lc.get("sigilo", "?"))
+        return "%s (bolha de licenca AUSENTE deste acervo)" % lic[:12]
+    return lic
+
+
+def ponteiro(valor):
+    """Um campo que carrega ENDERECO: mostra o prefixo E o que ele APONTA.
+
+    Endereco nu nao ajuda a distinguir duas anotacoes. O que distingue e' o
+    CONTEUDO do alvo — e e' exatamente isso que a anotacao existe para dizer.
+
+    MAS o alvo pode ser MIDIA. O projeto ja' decidiu o que fazer com isso: bytes
+    que nao sao UTF-8 nao tem texto, e "a porta do texto nao julga o que nao e'
+    texto". Despejar bytes de um PNG no recorte da' LIXO ao modelo — medido:
+    uma anotacao do proprio canone aponta para um PNG, e a primeira versao desta
+    funcao mandou 70 caracteres de binario. Entao DECODIFICA-SE ESTRITO, e a
+    midia se declara midia.
+    """
+    if not valor or len(valor) != 64:
+        return valor or ""
+    for pasta in (DEP, QUEB):
+        g = os.path.join(pasta, valor)
+        if os.path.isfile(g):
+            d = campos(g)
+            if "tipo" in d:
+                return "%s aponta para %s %s" % (
+                    valor[:12], d.get("tipo"), d.get("nome", ""))
+            try:
+                bruto = open(g, "rb").read()
+            except OSError:
+                bruto = b""
+            try:
+                t = " ".join(bruto.decode("utf-8").split())
+                return "%s aponta para texto: %s" % (valor[:12], t[:70])
+            except UnicodeDecodeError:
+                return ("%s aponta para MIDIA de %d bytes "
+                        "(nao e' texto — a porta do texto nao julga)" % (valor[:12], len(bruto)))
+    return "%s (ALVO AUSENTE deste acervo)" % valor[:12]
+
+
+
+def ambito_deste_acervo():
+    """O nome do AMBITO deste acervo, pela MESMA tabela que o servidor usa.
+
+    O servidor le' `IL_AMBITOS=nome=caminho`. Aqui se faz a volta: procura o nome
+    cujo caminho E' esta raiz. Assim o nome que o modelo recebe e o nome que o
+    servidor serve NAO PODEM divergir — sao a mesma tabela, lida duas vezes.
+
+    MEDIDO 07/10/2026: nao existe INSTANCIA de ambito no deposito (zero nos dois
+    repos) e nenhum dos 25 campos se chama `ambito`. Logo, hoje, o ambito NAO e'
+    dado — e' resolucao de ambiente. Esta funcao DIZ quando nao acha, em vez de
+    inventar um nome: recorte que afirma um ambito inexistente e' a MESMA classe
+    de defeito do guarda que confundia Il com IltS, e do mesmo recorte para as
+    quatro anotacoes.
+    """
+    eu = os.path.abspath(raiz)
+    for par in os.environ.get("IL_AMBITOS", "").split(","):
+        if "=" in par:
+            n, c = par.split("=", 1)
+            if os.path.abspath(c.strip()) == eu:
+                return n.strip()
+    return ""
+
+
+def alcance_por_objeto():
+    """Quantos OBJETOS apontam para cada endereco. Uma passada.
+
+    O chamador passava `0` LITERAL, entao "apontado por N objeto(s)" nunca saiu —
+    apesar de o docstring prometer "quem o alcanca". Conta objetos que citam, nao
+    citacoes: e' o que a mensagem diz.
+    """
+    rex = re.compile("[0-9a-f]{64}")
+    conta = {}
+    for h, f, prov in objetos():
+        try:
+            t = open(f, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        for m in set(rex.findall(t)):
+            if m != h:
+                conta[m] = conta.get(m, 0) + 1
+    return conta
+
+
+def meta_janela(h, f, c, prov, alcancado_por, ambito=""):
     """A META-JANELA-MODULAR em miniatura: o recorte que o modelo recebe.
 
     Nao so' o CONTEUDO — ONDE o objeto esta', de que especie, de que ramo, e
-    quem o alcanca. Sem o ambito o modelo nao tem como distinguir, e foi medido:
-    as duas anotacoes 00de629d (CC0) e 3ac5e94f (reservado), que diferem SO' na
-    licenca, receberam ambas "Anotacao de verdade". Mesmo nome para duas coisas
-    diferentes e' a mesma classe de defeito do guarda que confundia Il com IltS.
+    quem o alcanca.
+
+    MEDIDO 07/10/2026, ANTES desta correcao: as QUATRO anotacoes canonicas
+    (00de629d, 06ede03821ce, 3ac5e94fbcd5, a53df751b8ca) recebiam o MESMO
+    recorte, com duas palavras: "especie: anotacao; procedencia: canon".
+
+    Nao era so' a licenca que faltava. O laco lia oito chaves (nome, ramo, prazo,
+    numero, papel, titulo, catalogo, sigilo) e a anotacao NAO TEM NENHUMA DELAS:
+    os campos dela sao tipo, conteudo, licenca. O recorte saia vazio POR CONSTRUCAO
+    para a especie mais comum do acervo.
+
+    O docstring prometia cinco partes e chegavam duas:
+      "o CONTEUDO"           nao vinha   (nao estava no laco)
+      "ONDE o objeto esta'"  parcial     (procedencia: canon|quebrado)
+      "de que especie"       vinha
+      "de que ramo"          so' quando a especie tem `ramo`
+      "quem o alcanca"       NUNCA       (o chamador passava 0 literal)
     """
     p = ["especie: %s" % (c.get("tipo") or "conteudo (sem tipo)"),
-         "procedencia: %s" % prov]
-    for k in ("nome","ramo","prazo","numero","papel","titulo","catalogo","sigilo"):
-        if k in c: p.append("%s: %s" % (k, c[k]))
-    if alcancado_por: p.append("apontado por %d objeto(s)" % alcancado_por)
+         "procedencia: %s" % prov,
+         "ambito: %s" % (ambito or "NAO DECLARADO (nenhum IL_AMBITOS aponta para esta raiz)")]
+    for k in ("nome", "ramo", "prazo", "numero", "papel", "titulo", "catalogo"):
+        if k in c:
+            p.append("%s: %s" % (k, c[k]))
+    for k in ("conteudo", "texto", "letra"):
+        if len(c.get(k, "")) == 64:
+            p.append("%s: %s" % (k, ponteiro(c[k])))
+            break
+    if "sigilo" in c:
+        p.append("sigilo: %s" % c["sigilo"])
+    lic = legivel_licenca(c.get("licenca", ""))
+    if lic:
+        p.append("licenca: %s" % lic)
+    if alcancado_por:
+        p.append("apontado por %d objeto(s)" % alcancado_por)
     return "; ".join(p)
+
+
 
 def apelido(h, f, c, memo, usar_modelo, recorte=""):
     if "nome" in c: return c["nome"], False
@@ -118,12 +272,14 @@ def apelido(h, f, c, memo, usar_modelo, recorte=""):
 def main():
     usar_modelo = "--gerar" in sys.argv
     memo = cache(); novos = dict(memo); saida = []
+    amb = ambito_deste_acervo()
+    alcan = alcance_por_objeto()
     for h, f, prov in objetos():
         c = campos(f)
         if not c: continue
         esp = c.get("tipo", "-")
         if esp in ("campo", "especie", "caminho", "vocabulario", "licenca"): continue
-        n, gerado = apelido(h, f, c, novos, usar_modelo, meta_janela(h, f, c, prov, 0))
+        n, gerado = apelido(h, f, c, novos, usar_modelo, meta_janela(h, f, c, prov, alcan.get(h, 0), amb))
         niv, porque = nivel(c, prov, h)
         saida.append((niv, n, esp, h, porque))
     if usar_modelo: cache(False, novos)
