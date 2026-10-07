@@ -101,9 +101,16 @@ audio{width:100%;margin:5px 0;height:36px}
     <button id="t-acervo" aria-selected="false">acervo</button>
     <button id="t-acrescentar" aria-selected="false">acrescentar</button>
     <button id="t-anotacoes" aria-selected="true">anotações</button>
+    <button id="t-verificar" aria-selected="false">verificar</button>
   </div>
 </header>
 <main>
+
+  <p class="dica" id="camadas"><b>as quatro camadas, e onde cada uma mora aqui:</b>
+    <b>1 estado</b> → painéis · acervo &nbsp;·&nbsp; <b>2 verificar</b> → verificar
+    &nbsp;·&nbsp; <b>3 criar</b> → conversas · acrescentar · anotações
+    &nbsp;·&nbsp; <b>4 manter</b> → painéis (prazos)
+    <br><span id="cam-falta"></span></p>
   <section id="s-conversas">
     <div id="fala"><div class="msg sis">conversa com o acervo. eu respondo LENDO o depósito — e quando não sei, digo que não sei.
 
@@ -165,6 +172,20 @@ cada pergunta vira um objeto no acervo: a conversa fica gravada, e não se perde
     <div id="prev"></div>
   </section>
 
+  <section id="s-verificar">
+    <p class="dica"><b>CAMADA 2 — VERIFICAR.</b> Roda o juiz e a prosa. <b>portão de
+    entrada: nada sobe sem esta camada verde.</b> Aqui não se lê log inteiro: lê-se, por
+    passo, SE RODOU, QUANDO e a MEDIDA — e, quando falhou, a causa.</p>
+    <div class="cards" id="v-cards"></div>
+    <h2>os oito passos da cadeia</h2>
+    <table id="v-passos"></table>
+    <h2>recibo</h2>
+    <div id="v-recibo"><p class="dica">lendo…</p></div>
+    <div id="v-corpo"></div>
+    <p class="dica" id="v-estado"></p>
+    <button class="bp" id="v-rodar">rodar a cadeia inteira (leva ~3 min)</button>
+  </section>
+
   <section id="s-anotacoes" class="on">
     <p class="dica">nota de voz. ela vira <b>conteúdo</b> no acervo, e a anotação que aponta
     para ela nasce <b>privada</b> — vai para o acervo do ateliê, nunca para o cânone.
@@ -184,7 +205,7 @@ const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":
 let modo = "estatico", vivo = false;
 try { modo = (location.protocol==="file:") ? "estatico" : "servidor"; } catch(e){}
 
-const ABAS = ["conversas","paineis","acervo","acrescentar","anotacoes"];
+const ABAS = ["conversas","paineis","acervo","acrescentar","anotacoes","verificar"];
 function abrir(qual){
   ABAS.forEach(x=>{
     const sec=document.getElementById("s-"+x), bt=document.getElementById("t-"+x);
@@ -195,9 +216,62 @@ function abrir(qual){
   if(qual==="acervo") desenharAcervo();
   if(qual==="anotacoes") desenharAnotacoes();
   if(qual==="acrescentar") camposDe();
+  if(qual==="verificar") desenharVerificar();
 }
+async function desenharVerificar(){
+  let d;
+  try { d = await (await fetch("api/verificar")).json(); }
+  catch(e){ d = {erro: String(e.message||e)}; }
+  if(d.erro){ document.getElementById("v-corpo").innerHTML =
+      '<div class="av">nao consegui ler a camada 2: '+esc(d.erro)+'</div>'; return; }
+  document.getElementById("v-cards").innerHTML = [
+    ["passos com prova", (d.passos||[]).filter(p=>p.rodou).length+" / "+(d.passos||[]).length],
+    ["falhou", (d.falhou||[]).length],
+    ["nunca rodou", (d.nunca_rodou||[]).length]
+  ].map(([r,v])=>'<div class="card"><div class="v">'+esc(v)+'</div><div class="r">'+esc(r)+'</div></div>').join("");
+
+  let h = "<tr><th>passo</th><th>estado</th><th>medida</th><th>quando</th></tr>";
+  (d.passos||[]).forEach(p=>{
+    const est = p.falhou ? '<span style="color:#e66">FALHOU</span>' : (p.rodou ? "ok" : "—");
+    h += '<tr><td class="m">'+esc(p.passo)+'</td><td>'+est+'</td><td class="m">'
+       + esc(p.medida||"—")+'</td><td class="m">'
+       + esc(String(p.quando||"—").replace("T"," ").replace("Z",""))+'</td></tr>';
+    if(p.falhou && p.erro) h += '<tr><td colspan="4" class="m">↳ '+esc(p.erro)+'</td></tr>';
+  });
+  document.getElementById("v-passos").innerHTML = h;
+
+  const r = (d.recibos||[])[0];
+  document.getElementById("v-recibo").innerHTML = r
+    ? '<div class="av"><b>'+(r.passou?"PASSOU":"FALHOU")+'</b> · etapa '+esc(r.etapa)
+      +' · '+esc(String(r.quando||"").replace("T"," ").replace("Z",""))+'</div>'
+      +'<pre class="m">'+esc(r.corpo)+'</pre>'
+    : '<p class="dica">nenhum recibo no disco — esta camada nunca rodou neste âmbito.</p>';
+
+  document.getElementById("v-corpo").innerHTML =
+    '<p class="dica"><b>veredito:</b> '+esc(d.veredito)+'<br>'
+    +'<b>casos de uso desta camada:</b> '+esc((d.casos_de_uso||[]).join(" · "))
+    +(d.como_rodar?'<br><span class="m">'+esc(d.como_rodar)+'</span>':'')+'</p>';
+}
+
 ABAS.forEach(x=>{ const bt=document.getElementById("t-"+x); if(bt) bt.onclick=()=>abrir(x); });
 atualizarEstado();
+{ const b=document.getElementById("v-rodar");
+  if(b) b.onclick = async ()=>{
+    b.disabled=true; b.textContent="lançando…";
+    const d = await chamar("api/verificar", {etapa:"tudo"});
+    document.getElementById("v-estado").textContent = d.lancou
+      ? ("lançada. "+d.aviso+"  ·  log: "+d.log)
+      : ("não lancei: "+(d.erro||"?"));
+    b.disabled=false; b.textContent="rodar a cadeia inteira (leva ~3 min)";
+    if(!d.lancou) return;
+    let n=0; const t=setInterval(async ()=>{ n++; await desenharVerificar();
+      if(n>=60) clearInterval(t); }, 15000);
+  };
+  const f=document.getElementById("cam-falta");
+  if(f) f.textContent = "ainda falta da camada 4: apagar o que ninguém alcança, "
+    + "e substituir a janela escrita à mão por saída gerada.";
+}
+
 
 function render(d){
   DADOS = d;

@@ -30,7 +30,7 @@ AMBITO E' PARAMETRO, NAO SUPOSICAO. Nenhum caminho de repositorio esta' escrito
 no codigo: eles vem do ambiente. O mesmo servidor serve o Il e o IltS — e o
 cabecalho de cada resposta DIZ qual ambito mediu.
 """
-import hashlib, json, os, re, sys, time, unicodedata
+import hashlib, json, os, re, subprocess, sys, time, unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, unquote
 # `paineis` mora ao lado deste arquivo. O caminho e' posto a mao para o
@@ -868,6 +868,144 @@ def _resposta_acervo(raiz, q):
             "e' outro ato: ele manda a pergunta para fora da maquina.")
 
 
+# ═══ CAMADA 2 — VERIFICAR ════════════════════════════════════════════════════
+# A CAMADA QUE FALTAVA EM TODO LUGAR. O CLI so' IMPRIMIA a instrucao ("corrida
+# inteira: lean --run cadeia/Cadeia.lean --etapa tudo") e a interface nao tinha
+# nem isso — o portao de entrada nao existia como coisa que se USA.
+#
+# O caso de uso e' explicito: "para saber QUAL passo falhou, sem ler log
+# inteiro". Por isso aqui NAO se devolve o log: devolve-se, por passo, SE RODOU,
+# QUANDO, a MEDIDA (a linha de total) e — quando falhou — a CAUDA que diz o
+# motivo. A extracao da medida e' a MESMA do `numero` do Cadeia.lean: a ultima
+# linha que contem 'f' (conferencias/falhas, documento(s)/falha(s)).
+
+ORDEM_DA_CADEIA = ["versao-do-lean", "hash-sha256", "spec-bolha", "ponte",
+                   "arreio-olean", "mao-escreve-a-cancao", "conformidade",
+                   "higiene-da-prosa"]
+
+
+def _quando_do_arquivo(p):
+    try:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(p)))
+    except Exception:
+        return ""
+
+
+def _cauda(p):
+    """A CAUSA, nao o arquivo: a primeira linha que diz 'error' ou 'falha'."""
+    try:
+        with open(p, "r", errors="replace") as f:
+            for l in f:
+                t = l.strip()
+                if t and ("error" in t or "Error" in t or "falha" in t):
+                    return t[:220]
+    except Exception:
+        pass
+    return ""
+
+
+RE_TOTAL = re.compile(r"\d+\s+(confer|documento|falha)")
+
+
+def _medida(txt):
+    """A linha de total — e SO' quando ela E' um total.
+
+    A primeira versao pegava "a ultima linha que contem f", que e' o que o
+    `numero` do Cadeia.lean faz. Mas ele so' e' chamado sobre os arquivos que
+    TEM contagem. Aplicado aos oito passos, devolvia bobagem: "instead of" para
+    o arreio-olean, o cabecalho da versao do Lean para o versao-do-lean, e um
+    hash solto para a mao. MEIA-VERDADE E' PIOR QUE SILENCIO: passo sem
+    contagem fica sem medida, e a tela nao inventa uma.
+    """
+    for l in reversed(txt.split("\n")):
+        if RE_TOTAL.search(l):
+            return l.strip()[:200]
+    return ""
+
+
+def verificar(raiz):
+    passos = []
+    for r in ORDEM_DA_CADEIA:
+        prova = os.path.join(raiz, "prova-" + r + ".txt")
+        marco = os.path.join(raiz, ".falhou-" + r)
+        existe = os.path.exists(prova)
+        falhou = os.path.exists(marco)
+        texto = ""
+        if existe:
+            try:
+                with open(prova, "r", errors="replace") as f:
+                    texto = f.read()
+            except Exception:
+                pass
+        passos.append({"passo": r, "rodou": existe, "falhou": falhou,
+                       "quando": _quando_do_arquivo(prova) if existe else "",
+                       "medida": _medida(texto) if existe else "",
+                       "erro": _cauda(prova) if falhou else ""})
+
+    recibos = []
+    for etapa in ("tudo", "juiz", "prosa"):
+        p = os.path.join(raiz, "recibo-" + etapa + ".txt")
+        if not os.path.exists(p):
+            continue
+        try:
+            with open(p, "r", errors="replace") as f:
+                corpo = f.read()
+        except Exception:
+            continue
+        recibos.append({"etapa": etapa, "quando": _quando_do_arquivo(p),
+                        "passou": "PASSOU" in corpo[:400], "corpo": corpo[:2000]})
+
+    falhou = [p["passo"] for p in passos if p["falhou"]]
+    nunca = [p["passo"] for p in passos if not p["rodou"]]
+    return {
+        "ambito": raiz, "camada": 2,
+        "papel": "roda o juiz e a prosa — o portao de entrada",
+        "casos_de_uso": ["antes de empurrar para a origem",
+                         "depois de cada mudanca que troca o leitor",
+                         "saber QUAL passo falhou, sem ler log inteiro"],
+        "ordem": ORDEM_DA_CADEIA,
+        "passos": passos,
+        "recibos": recibos,
+        "falhou": falhou,
+        "nunca_rodou": nunca,
+        "veredito": (("FALHOU em " + ", ".join(falhou)) if falhou else
+                     ("nunca rodou: " + ", ".join(nunca)) if nunca else
+                     "PASSOU — os 8 passos tem prova no disco"),
+        "como_rodar": "POST neste mesmo caminho (lanca em segundo plano), ou: "
+                      "LEAN_PATH=juiz:arreio lean --run cadeia/Cadeia.lean --etapa tudo",
+    }
+
+
+def lancarCadeia(raiz, etapa="tudo"):
+    """Lanca a cadeia DESLIGADA da sessao e volta NA HORA.
+
+    A corrida leva ~2-3 min (so' o passo `arreio-olean` compila 2.875 linhas,
+    ~40 s) — muito mais que qualquer espera razoavel de HTTP. Entao ela sai por
+    `setsid`, e a tela ACOMPANHA lendo o recibo e os marcos de falha. E' o mesmo
+    arranjo do portao do pre-push, e o unico que sobrevive ao teto desta casa.
+    """
+    if etapa not in ("juiz", "prosa", "tudo"):
+        return {"lancou": False, "erro": "etapa desconhecida: " + etapa,
+                "etapas": ["juiz", "prosa", "tudo"]}
+    env = dict(os.environ)
+    elan = os.path.join(os.path.expanduser("~"), ".elan", "bin")
+    env["PATH"] = elan + os.pathsep + env.get("PATH", "")
+    env.setdefault("ELAN_TOOLCHAIN", "leanprover/lean4:v4.34.0")
+    log = "/tmp/cadeia-" + etapa + ".log"
+    cmd = ("cd " + raiz + " && LEAN_PATH=juiz:arreio " + env.get("IL_LEAN", "lean")
+           + " --run cadeia/Cadeia.lean --etapa " + etapa)
+    try:
+        with open(log, "wb") as f:
+            subprocess.Popen(["setsid", "sh", "-c", cmd], stdout=f, stderr=f,
+                             stdin=subprocess.DEVNULL, env=env,
+                             start_new_session=True)
+    except Exception as ex:
+        return {"lancou": False, "erro": str(ex)}
+    return {"lancou": True, "etapa": etapa, "log": log,
+            "aviso": "a corrida leva ~2-3 min. Acompanhe pelo recibo e pelos marcos "
+                     "de falha — esta rota NAO espera por ela."}
+
+
 def janelaDe(raiz, nome):
     """A META-JANELA escolhida, resolvida do acervo.
 
@@ -1146,7 +1284,8 @@ class Mao(BaseHTTPRequestHandler):
             return self.responder({"ambito": raiz,
                                    "rotas": ["estado", "diagnostico", "formulario", "grafo", "painel[/tempo|peso|forma|alcance|licencas]",
                                              "bytes/<e>", "objeto/<e>", "agentes",
-                                             "recorte/<agente>", "compor (POST)"]})
+                                             "recorte/<agente>", "verificar",
+                                             "compor (POST)"]})
         verbo, args = resto[0], resto[1:]
         try:
             if verbo == "estado" and not args:
@@ -1159,6 +1298,8 @@ class Mao(BaseHTTPRequestHandler):
                 return self.responder(retrato(raiz))
             if verbo == "agentes" and not args:
                 return self.responder({"ambito": raiz, "agentes": agentes(raiz)})
+            if verbo == "verificar" and not args:
+                return self.responder(verificar(raiz))
             if verbo == "formulario":
                 objs = objetos(raiz)
                 f = formulario(objs)
@@ -1250,6 +1391,9 @@ class Mao(BaseHTTPRequestHandler):
                 lic = licencaDoModelo(alvo, (b.get("modelo") or "").strip() or None) or ""
             return self.responder(registrar(alvo, b.get("texto") or "",
                                             (b.get("papel") or "pergunta").strip(), lic))
+        if resto and resto[0] == "verificar":
+            b = self.corpo()
+            return self.responder(lancarCadeia(alvo, (b.get("etapa") or "tudo").strip()))
         if resto and resto[0] == "chat":
             b = self.corpo()
             return self.responder(conversar(alvo, (b.get("q") or "").strip(),
