@@ -1211,6 +1211,30 @@ def _avisos(e, valores, rel):
     return fora
 
 
+
+def caminhos_externos(raiz, objs=None):
+    """Os lugares DECLARADOS que nao sao diretorios DESTE repositorio.
+
+    O sinal e' de FATO, nao de convencao: `exemplos/deposito/objetos` existe como
+    pasta; `api.deepseek.com/chat/completions` nao existe. Antes isto era um
+    LITERAL no codigo — `destino_externo_declarado: False` — e o servidor
+    AFIRMAVA, sem olhar, que nenhuma bolha declarava destino externo. A afirmacao
+    virou FALSA no instante em que a bolha foi declarada: mesma classe do destino
+    escrito em cli/modelo, e do `"sigilo": "privado"` repetido aqui.
+    """
+    objs = objs if objs is not None else objetos(raiz)
+    fora = []
+    for o in objs:
+        if o["tipo"] != "caminho":
+            continue
+        p = (o["campos"].get("padrao") or "").strip()
+        if not p:
+            continue
+        if not os.path.isdir(os.path.join(raiz, p)):
+            fora.append({"nome": o["campos"].get("nome"), "padrao": p,
+                         "sigilo": o["campos"].get("sigilo"),
+                         "endereco": o["endereco"]})
+    return fora
 def recorte(raiz, nome):
     """A META-JANELA-MODULAR, montada e DITA. Nada e' enviado; nada e' gravado."""
     objs = objetos(raiz)
@@ -1246,6 +1270,15 @@ def recorte(raiz, nome):
     for o in objs:
         if o["tipo"] == "proposito":
             juntar("camada: %s" % o["nome"], o["campos"].get("texto", ""), "proposito")
+    # A LEI DO RECIPIENTE: LIDA, nao afirmada. O ambito declara os lugares que
+    # usa; um deles nao e' diretorio daqui — e' destino de fora.
+    amb_nome = nomeDoAmbito(raiz)
+    dec = declaracaoDoAmbito(raiz, amb_nome) if amb_nome else None
+    ext = caminhos_externos(raiz, objs)
+    do_ambito = []
+    if dec:
+        padroes = set(c.get("padrao") for c in (dec.get("caminhos") or []))
+        do_ambito = [e for e in ext if e.get("padrao") in padroes]
     privados = [p for p in pedacos if p.get("morada") == "privado"]
     ausentes = [p for p in pedacos if not p.get("presente")]
     sem_sig = [p for p in pedacos if p.get("morada") == "NAO DECLARADO"]
@@ -1253,9 +1286,15 @@ def recorte(raiz, nome):
             "contagem": {"pedacos": len(pedacos),
                          "bytes": sum(p.get("bytes", 0) for p in pedacos)},
             "LEI DO RECIPIENTE": {
-                "destino_externo_declarado": False,
-                "nota": ("NENHUMA bolha deste ambito declara destino externo. Se este recorte "
-                         "for enviado a um recipiente de fora, sai sem lei que olhe para isso."),
+                "destino_externo_declarado": bool(do_ambito),
+                "destinos": do_ambito,
+                "nota": (("o ambito `%s` DECLARA %d destino(s) externo(s): %s — o que sai tem "
+                          "para onde apontar, e o sigilo de la' diz se protege."
+                          % (amb_nome, len(do_ambito),
+                             ", ".join("%s (sigilo: %s)" % (e["nome"], e["sigilo"]) for e in do_ambito)))
+                         if do_ambito else
+                         ("NENHUMA bolha deste ambito declara destino externo. Se este recorte "
+                          "for enviado a um recipiente de fora, sai sem lei que olhe para isso.")),
                 "de_morada_privada": [p["rotulo"] for p in privados],
                 "de_morada_nao_declarada": [p["rotulo"] for p in sem_sig],
                 "apontados_e_ausentes": [p["rotulo"] for p in ausentes]}}
