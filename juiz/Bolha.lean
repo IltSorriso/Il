@@ -547,7 +547,7 @@ def registroEspecies : List (String × List String) :=
     -- pessoa ainda: inventar o vocabulário de usuário antes de saber o que uma
     -- pessoa É seria inventar vocabulário, que é o defeito que esta tabela
     -- existe para não cometer.
-    ("ambito",       ["tipo", "nome", "dono", "caminhos", "licenca"]),
+    ("ambito",       ["tipo", "nome", "dono", "caminhos", "agentes", "licenca"]),
     -- O LEITOR. Estas quatro NÃO podem virar bolha: são o que LÊ uma bolha.
     -- Sem elas não há por onde começar, e é a única parte do vocabulário que
     -- mora no Lean para sempre. Tudo o que está ACIMA delas é dado.

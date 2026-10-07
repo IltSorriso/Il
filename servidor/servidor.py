@@ -86,7 +86,9 @@ def bolhasDeAmbito(raiz):
                 "endereco": o["endereco"], "dono": c.get("dono"),
                 "licenca": c.get("licenca"), "procedencia": o["procedencia"],
                 "enderecos": [x for x in (c.get("caminhos") or "").split(",")
-                              if len(x) == 64]}
+                              if len(x) == 64],
+                "enderecos_agentes": [x for x in (c.get("agentes") or "").split(",")
+                                      if len(x) == 64]}
     return amb, cam
 
 
@@ -1254,6 +1256,30 @@ def destinos_do_ambito(raiz, objs=None):
     padroes = set(c.get("padrao") for c in (dec.get("caminhos") or [])) if dec else set()
     return [e for e in caminhos_externos(raiz, objs) if e.get("padrao") in padroes]
 
+def quemDeclaraOAgente(raiz, objs=None):
+    """De que ambito(s) e' cada agente — LIDO da bolha, nao suposto pela URL.
+
+    Um agente pode nao ser de ambito nenhum: as janelas de PAPEL (a linha de
+    comando, o ritmo, as bolhas) valem nos dois acervos, e nao haver'ia por que
+    amarrar cada uma a um. Por isso a resposta tem TRES casos, e nao dois:
+
+      - declarado por um ou mais ambitos  -> a janela tem dono;
+      - declarado por nenhum              -> e' janela de PAPEL, nao de acervo;
+      - o servidor cai no caso do meio quando pedem a janela de um acervo
+        dentro do OUTRO. Antes disso ele servia em silencio, e o pedido de
+        `/il/recorte/agente-ilts` respondia como se fosse do il.
+    """
+    objs = objs if objs is not None else objetos(raiz)
+    dono = {}
+    for o in objs:
+        if o.get("tipo") != "ambito":
+            continue
+        c = o["campos"]
+        for e in (c.get("agentes") or "").split(","):
+            if len(e) == 64:
+                dono.setdefault(e, []).append(c.get("nome"))
+    return dono
+
 def recorte(raiz, nome):
     """A META-JANELA-MODULAR, montada e DITA. Nada e' enviado; nada e' gravado."""
     objs = objetos(raiz)
@@ -1264,6 +1290,8 @@ def recorte(raiz, nome):
         return None
     a = alvo[0]
     pedacos = []
+    _dono = quemDeclaraOAgente(raiz, objs).get(a["endereco"], [])
+    _eu = nomeDoAmbito(raiz)
 
     def juntar(rotulo, end, origem):
         if not end:
@@ -1299,6 +1327,20 @@ def recorte(raiz, nome):
     return {"ambito": raiz, "agente": a, "pedacos": pedacos,
             "contagem": {"pedacos": len(pedacos),
                          "bytes": sum(p.get("bytes", 0) for p in pedacos)},
+            "JANELA": {
+                "nome": a["nome"],
+                "declarado_por": _dono,
+                "deste_ambito": (_eu in _dono) if _dono else None,
+                "nota": (("a janela `%s` e' declarada pelo(s) ambito(s) %s."
+                          % (a["nome"], ", ".join(_dono))) if (_eu in _dono) else
+                         (("a janela `%s` NAO e' declarada pelo ambito `%s`%s."
+                           % (a["nome"], _eu,
+                              " — ela pertence a %s" % ", ".join(_dono)))
+                          if _dono else
+                          ("a janela `%s` nao e' declarada por ambito nenhum: e' janela de "
+                           "PAPEL, que vale em qualquer acervo. Nada aqui a recusa."
+                           % a["nome"]))),
+            },
             "LEI DO RECIPIENTE": {
                 "destino_externo_declarado": bool(do_ambito),
                 "destinos": do_ambito,
