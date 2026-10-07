@@ -24,6 +24,9 @@ O INSUMO DE TESTE NAO E' COMPROMISSO. Objeto que mora em exemplos/quebrados/obje
 nao entra na conta do itinerario: o `ramo` dele e' rotulo de teste, e nao precisa
 resolver. Mas a FORMA dele continua sendo dita — um prazo malformado num caso negativo
 e' o PONTO dele, e calar a boca sobre isso seria perder o unico sinal que ele da'.
+
+Insumo para tela:
+  cli/alertas --json      os mesmos alertas como DADO, para uma tela nao refazer a conta
 """
 import datetime, os, re, subprocess, sys
 raiz = os.environ.get("IL_RAIZ") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -199,6 +202,23 @@ def main():
             alertas.append((2, "SEM NOME PROPRIO", h, "so' alcancavel pelo endereco"))
 
     alertas.sort(key=lambda x: (-x[0], x[1], x[2]))
+    if "--json" in sys.argv:
+        # A SAIDA DE DADO. O nivel e' o mesmo que o texto mostra — a tela nao
+        # refaz conta nenhuma, so' desenha. `marca` viaja junto para o texto e o
+        # dado nao divergirem no simbolo.
+        import json as _json
+        marcas = {3: "[!!!]", 2: "[ ! ]", 1: "[   ]"}
+        alto = sum(1 for x in alertas if x[0] == 3)
+        print(_json.dumps({
+            "tronco": tronco(),
+            "alertas": [{"nivel": n, "marca": marcas[n], "rotulo": r,
+                         "endereco": e, "motivo": m} for n, r, e, m in alertas],
+            "contagem": {"total": len(alertas), "alto": alto,
+                         "medio": sum(1 for x in alertas if x[0] == 2),
+                         "memoria": sum(1 for x in alertas if x[0] == 1),
+                         "objetos": len(objs), "ramos_fora": len(ramos())},
+        }, ensure_ascii=False, indent=1))
+        return 1 if alto else 0
     marca = {3: "[!!!]", 2: "[ ! ]", 1: "[   ]"}
     print("ALERTAS — nivel por FATOS, nao por opiniao")
     print("  entram na conta: a bolha · os metadados · a conformidade com o itinerario")

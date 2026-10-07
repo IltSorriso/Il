@@ -1284,10 +1284,27 @@ class Mao(BaseHTTPRequestHandler):
             return self.responder({"ambito": raiz,
                                    "rotas": ["estado", "diagnostico", "formulario", "grafo", "painel[/tempo|peso|forma|alcance|licencas]",
                                              "bytes/<e>", "objeto/<e>", "agentes",
-                                             "recorte/<agente>", "verificar",
+                                             "recorte/<agente>", "verificar", "alertas",
                                              "compor (POST)"]})
         verbo, args = resto[0], resto[1:]
         try:
+            if verbo == "alertas" and not args:
+                # A QUINTA PRIMA. O alertas e' a REGUA do itinerario, e a conta
+                # inteira ja' esta' feita no cli. Esta rota NAO refaz nada: roda
+                # o MESMO programa e devolve o que ele mediu — fonte unica, e a
+                # tela desenha em vez de recalcular. (O cli devolve 1 quando ha'
+                # alerta ALTO, e isso e' resposta valida, nao erro.)
+                import subprocess as _sp
+                r = _sp.run([sys.executable, os.path.join(raiz, "cli", "alertas"), "--json"],
+                            capture_output=True, text=True, timeout=90,
+                            env=dict(os.environ, IL_RAIZ=raiz))
+                if r.returncode not in (0, 1) or not r.stdout.strip():
+                    return self.responder({"erro": "o cli/alertas nao devolveu dado",
+                                           "codigo": r.returncode,
+                                           "detalhe": (r.stderr or "")[-300:]}, 500)
+                d = json.loads(r.stdout)
+                d["ambito"] = raiz
+                return self.responder(d)
             if verbo == "estado" and not args:
                 # A MESMA FORMA QUE A TELA DESENHA. Antes devolvia `estado()`,
                 # de forma diferente, e o render morria em `caminhos.forEach`.
